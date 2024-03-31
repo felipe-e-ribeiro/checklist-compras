@@ -1,0 +1,53 @@
+/* Estilos para o modo claro */
+:root {
+    --background-color: #fff;
+    --text-color: #000;
+    --form-background-color: #fff;
+    --form-text-color: #000;
+    --button-background-color: #000;
+    --button-text-color: #fff;
+}
+
+/* Estilos para o modo escuro */
+[data-theme="dark"] {
+    --background-color: #333;
+    --text-color: #fff;
+    --form-background-color: #454545;
+    --form-text-color: #fff;
+    --button-background-color: #008000;
+    --button-text-color: #fff;
+}
+
+body {
+    background-color: var(--background-color);
+    color: var(--button-background-color);
+}
+
+/* Aplicar cores de fundo e texto aos elementos de formulário */
+input[type="text"], button {
+    background-color: var(--form-background-color);
+    color: var(--button-background-color);
+}
+
+button {
+    background-color: var(--button-background-color);
+    color: var(--button-text-color);
+}
+
+
+.form-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px; /* Espaçamento abaixo do contêiner dos formulários */
+}
+
+.form-container form {
+    flex: 1; /* Faz cada formulário ocupar espaço igual */
+    margin: 0 10px; /* Espaçamento entre os formulários */
+}
+
+/* Estilo adicional para alinhar os elementos dentro dos formulários */
+.form-container input[type="text"] {
+    margin-right: 5px;
+}

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <!-- Seu CSS personalizado vem depois do Bootstrap -->
+    <link rel="stylesheet" href="./public/style.css">
+
+    <title>Lista de Compras</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>    
+
+    <button class="btn btn-outline-success my-2 my-sm-0" id="theme-toggle">Alternar Tema</button>
+    <div class="container">
+        <h1 class="mt-5">Lista de Compras</h1>
+        <div class="row">
+            <div class="col-md-6">
+                <form action="/add" method="POST" class="form-inline my-2 my-lg-0">
+                    <input class="form-control mr-sm-2" type="text" name="item" placeholder="Adicionar item" required>
+                    <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Adicionar</button>
+                </form>
+            </div>
+            <div class="col-md-6">
+                <form action="/clear-checked" method="POST">
+                    <button class="btn btn-outline-danger my-2 my-sm-0" type="submit">Limpar Itens Concluídos</button>
+                </form>
+            </div>
+        </div>
+
+        <ul class="list-group mt-3">
+            <% items.forEach(function(item) { %>
+                <li class="list-group-item">
+                    <form action="/check" method="POST" class="form-inline my-2 my-lg-0" style="display: inline">
+                        <input class="form-control mr-sm-2" type="checkbox" name="checked" onchange="this.form.submit()" <%= item.checked ? 'checked' : '' %>>
+                        <input class="form-control mr-sm-2" type="hidden" name="id" value="<%= item.id %>">
+                    </form>
+                    <%= item.item %>
+                </li>
+            <% }); %>
+        </ul>
+    </div>
+
+    
+    <script>
+        // Detecta o tema preferido do sistema
+        const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const currentTheme = localStorage.getItem("theme") ? localStorage.getItem("theme") : prefersDarkScheme ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", currentTheme);
+    
+        // Aplica o tema correto aos botões ao carregar a página
+        updateButtonClasses(currentTheme);
+    
+        const themeToggleBtn = document.getElementById("theme-toggle");
+        themeToggleBtn.addEventListener("click", function() {
+            let theme = document.documentElement.getAttribute("data-theme");
+            switch (theme) {
+                case "dark":
+                    theme = "light";
+                    break;
+                default:
+                    theme = "dark";
+            }
+            document.documentElement.setAttribute("data-theme", theme);
+            localStorage.setItem("theme", theme); // Salva o tema escolhido no localStorage
+    
+            // Atualiza as classes dos botões conforme o tema
+            updateButtonClasses(theme);
+        });
+    
+        function updateButtonClasses(theme) {
+            document.querySelectorAll('button').forEach(button => {
+                if (theme === "dark") {
+                    button.classList.remove('btn-light');
+                    button.classList.add('btn-dark');
+                } else {
+                    button.classList.remove('btn-dark');
+                    button.classList.add('btn-light');
+                }
+            });
+        }
+    </script>
+    
+    
+</body>
+</html>

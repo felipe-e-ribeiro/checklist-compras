@@ -1,0 +1,13 @@
+ARG ARCH=
+FROM ${ARCH}node:lts-alpine3.19
+
+ENV MYSQL_HOST=$MYSQL_HOST
+ENV MYSQL_USER=$MYSQL_USER
+ENV MYSQL_PASSWORD=$MYSQL_PASSWORD
+ENV MYSQL_DB=$MYSQL_DB
+
+WORKDIR /opt/website
+COPY ./website /opt/website
+
+RUN npm install
+CMD node server.js
