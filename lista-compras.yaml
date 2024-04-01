@@ -10,18 +10,18 @@ spec:
   selector:
     matchLabels:
       app: lista-compras-app
-      version: 1.0
   strategy: {}
   template:
     metadata:
       creationTimestamp: null
       labels:
         app: lista-compras-app
+        version: "1.0"
     spec:
       containers:
-       - env:
+      - env:
         - name: VERSION
-          value: 1.0
+          value: "1.0"
       - image: feliperibeiro95/lista-compras:1.0
         name: lista-compras-app
         resources: {}
