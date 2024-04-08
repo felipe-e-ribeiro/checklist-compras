@@ -17,7 +17,7 @@ app.use(express.static('public'));
 app.set('view engine', 'ejs');
 
 app.get('/', (req, res) => {
-    db.query('SELECT * FROM items', (err, result) => {
+    db.query('SELECT * FROM items ORDER by checked', (err, result) => {
         if (err) throw err;
         res.render('index', { items: result });
     });
