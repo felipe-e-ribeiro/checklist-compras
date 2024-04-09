@@ -54,7 +54,7 @@ jobs:
         uses: actions/checkout@v3
         
       - name: Check for tag
-        id: tag-check
+        id: tag-check-local
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
           if [ -z "$TAG_NAME" ]; then
