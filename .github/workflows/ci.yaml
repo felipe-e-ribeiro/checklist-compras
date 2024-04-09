@@ -23,8 +23,8 @@ jobs:
             exit 1
           fi
           echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-        - name: list
-          run: ls -la
+      - name: list
+        run: ls -la
 
   build-and-push:
     needs: check-tag
