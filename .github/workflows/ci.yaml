@@ -64,9 +64,9 @@ jobs:
           echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
           
       - name: Check for tag
-        run: echo ${{ GITHUB_OUTPUT }}
+        run: echo $GITHUB_OUTPUT
       - name: Check for tag2
-        run: echo ${{ TAG_NAME }}
+        run: echo $TAG_NAME
 
   deploy:
     needs: check-tag-local
