@@ -48,4 +48,4 @@ spec:
             secretKeyRef:
               name: lista-compras
               key: MYSQL_USER
-status: {}
+status: {} 
