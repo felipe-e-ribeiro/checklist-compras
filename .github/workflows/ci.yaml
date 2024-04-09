@@ -8,6 +8,8 @@ on:
 jobs:
   check-tag:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag-check.outputs.tag }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -20,7 +22,7 @@ jobs:
             echo "::error::No tag found on this commit."
             exit 1
           fi
-          echo "::set-output name=tag::${TAG_NAME}"
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
 
   build-and-push:
     needs: check-tag
