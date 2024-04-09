@@ -45,3 +45,10 @@ jobs:
           push: true
           tags: feliperibeiro95/checklist-compras:${{ needs.check-tag.outputs.tag }}
           platforms: linux/amd64,linux/arm64
+
+  deploy:
+    needs: build-and-push
+    runs-on: self-hosted
+    steps:
+      - name: Change deployment image
+        run: kubectl set image deployment/lista-compras-app lista-compras-app=feliperibeiro95/checklist-compras:${{ needs.check-tag.outputs.tag }}
