@@ -44,9 +44,25 @@ jobs:
           tags: feliperibeiro95/checklist-compras:${{ needs.check-tag.outputs.tag }}
           platforms: linux/amd64,linux/arm64
 
-  deploy:
+ check-tag-local:
     needs: build-and-push
+    runs-on: self-hosted
+    outputs:
+      tag: ${{ steps.tag-check-local.outputs.tag }}
+    steps:   
+      - name: Check for tag
+        id: tag-check
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          if [ -z "$TAG_NAME" ]; then
+            echo "::error::No tag found on this commit."
+            exit 1
+          fi
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: check-tag-local
     runs-on: self-hosted
     steps:
       - name: Change deployment image
-        run: kubectl set image deployment/lista-compras-app lista-compras-app=feliperibeiro95/checklist-compras:${{ needs.build-and-push.outputs.tag }}
+        run: kubectl set image deployment/lista-compras-app lista-compras-app=feliperibeiro95/checklist-compras:${{ needs.check-tag-local.outputs.tag }}
