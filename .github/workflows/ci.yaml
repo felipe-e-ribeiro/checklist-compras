@@ -23,8 +23,6 @@ jobs:
             exit 1
           fi
           echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-      - name: list
-        run: ls -la
 
   build-and-push:
     needs: check-tag
@@ -51,4 +49,4 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Change deployment image
-        run: kubectl set image deployment/lista-compras-app lista-compras-app=feliperibeiro95/checklist-compras:${{ needs.check-tag.outputs.tag }}
+        run: kubectl set image deployment/lista-compras-app lista-compras-app=feliperibeiro95/checklist-compras:${{ needs.build-and-push.outputs.tag }}
