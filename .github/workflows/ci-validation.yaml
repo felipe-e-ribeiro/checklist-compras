@@ -1,0 +1,53 @@
+name: Multiarch Docker Build
+
+on:
+  push:
+    push:
+      - 'main'
+      - 'dev'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_DATABASE: ${{ env.MYSQL_DATABASE }}
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Set up Docker Environment
+      run: docker build -t my_app .
+      
+    - name: Start container
+      run: |
+        docker run -d --name node-app -p 3000:3000 --link mysql:db my_app
+
+    - name: Wait for MySQL to be ready
+      run: |
+        until docker exec mysql mysql -uroot -ppassword -e "SELECT 1"; do
+          echo "Waiting for MySQL to be up..."
+          sleep 5
+        done
+    
+    - name: Populate MySQL Database
+      run: docker exec -i mysql mysql -uroot -ppassword ${{ secrets.MYSQL_ROOT_PASSWORD }} < db/lista_compras.mysql
+      
+    - name: Test application
+      run: |
+        sleep 10  # waiting for Node app to start up
+        curl -s http://localhost:3000
+    
+    - name: Clean up
+      if: always()
+      run: docker stop node-app mysql
