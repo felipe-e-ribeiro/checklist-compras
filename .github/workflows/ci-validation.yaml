@@ -27,7 +27,7 @@ jobs:
     - name: Wait for MySQL to be ready
       run: |
         end=$(($(date +%s) + 60))
-        until docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE};" do
+        until docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE};"; do
           if [[ $(date +%s) -ge $end ]]; then
             echo "Database creation timed out."
             break
