@@ -26,7 +26,12 @@ jobs:
 
     - name: Wait for MySQL to be ready
       run: |
+        end=$(($(date +%s) + 60))
         until docker exec mysql mysql -uroot -ppassword -e "SELECT 1"; do
+          if [[ $(date +%s) -ge $end ]]; then
+            echo "MySQL startup timed out."
+            break
+          fi
           echo "Waiting for MySQL to be up..."
           sleep 5
         done
