@@ -27,7 +27,7 @@ jobs:
     - name: Wait for MySQL to be ready
       run: |
         end=$(($(date +%s) + 60))
-        until docker exec mysql mysql -uroot -ppassword ${{ secrets.MYSQL_ROOT_PASSWORD }} -e "SELECT 1"; do
+        until docker exec mysql mysql -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} -e "SELECT 1"; do
           if [[ $(date +%s) -ge $end ]]; then
             echo "MySQL startup timed out."
             break
@@ -37,7 +37,7 @@ jobs:
         done
     
     - name: Populate MySQL Database
-      run: docker exec -i mysql mysql -uroot -ppassword ${{ secrets.MYSQL_ROOT_PASSWORD }} < db/lista_compras.mysql
+      run: docker exec -i mysql mysql -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} < db/lista_compras.mysql
       
     - name: Test application
       run: |
