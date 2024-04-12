@@ -40,8 +40,11 @@ jobs:
         MYSQL_DATABASE: ${{ env.MYSQL_DATABASE }}
     
     - name: Populate MySQL Database
-      run: docker exec -i mysql mysql -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} < db/lista_compras.sql
-      
+      run: docker exec -i mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE}< db/lista_compras.sql
+      env:
+        MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+        MYSQL_DATABASE: ${{ env.MYSQL_DATABASE }}
+
     - name: Test application
       run: |
         sleep 10  # waiting for Node app to start up
