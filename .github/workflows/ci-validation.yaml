@@ -1,4 +1,4 @@
-name: Multiarch Docker Build
+name: Test Code
 
 on:
   push:
@@ -13,21 +13,21 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
-    - name: Set up Docker Environment
+    - name: Image for application
       run: docker build -t my_app .
 
     - name: Start Mysql
       run: |
         docker run -d --name mysql -e MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }} -e MYSQL_DATABASE=${{ env.MYSQL_DATABASE }} -p 3306:3306 mysql:5.7
 
-    - name: Start container
+    - name: Start container App
       run: |
         docker run -d --name node-app -p 3000:3000 --link mysql:db my_app
 
     - name: Wait for MySQL to be ready
       run: |
         end=$(($(date +%s) + 60))
-        until docker exec mysql mysql -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} -e "SELECT 1"; do
+        until docker exec mysql mysql -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} -e "CREATE DATABASE ${{ env.MYSQL_DATABASE }}"; do
           if [[ $(date +%s) -ge $end ]]; then
             echo "MySQL startup timed out."
             break
