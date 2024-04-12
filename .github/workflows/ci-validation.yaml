@@ -37,7 +37,7 @@ jobs:
         done
     
     - name: Populate MySQL Database
-      run: docker exec -i mysql mysql -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} < db/lista_compras.mysql
+      run: docker exec -i mysql mysql -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} < db/lista_compras.sql
       
     - name: Test application
       run: |
