@@ -53,8 +53,8 @@ jobs:
     - name: Populate MySQL Database
       run: docker exec mysql bash -c "mysql -uroot -p${MYSQL_ROOT_PASSWORD} \${MYSQL_DATABASE}\ < /tmp/lista_compras.sql"
       env:
-        MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}   
-        MYSQL_ROOT_PASSWORD: ${{ vars.MYSQL_DATABASE }}   
+        MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
+        MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
 
     - name: Show MySQL
       run: docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE} -e "show tables;"
