@@ -41,11 +41,11 @@ jobs:
       env:
         MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
 
-    - name: Wait for MySQL to be ready
-      run: docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE}";
-      env:
-        MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
-        MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
+    #- name: Wait for MySQL to be ready
+    #  run: docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE}";
+    #  env:
+    #    MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+    #    MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
 
     - name: Import MySQL Database
       run: docker cp db/lista_compras.sql mysql:/tmp
