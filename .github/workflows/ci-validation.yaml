@@ -28,7 +28,7 @@ jobs:
       run: |
         end=$(($(date +%s) + 60))
         until docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE}; select 1 from dual"; do
-          if [[ $(date +%s) -ge $end ]]; then
+          if [[ $(date +%s) -ge $end ]] || [[ $? == 1 ]]; then
             echo "Database creation timed out."
             break
           fi
@@ -43,7 +43,7 @@ jobs:
       run: docker cp db/lista_compras.sql mysql:/tmp
     
     - name: Populate MySQL Database
-      run: docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE} < /tmp/lista_compras.sql
+      run: docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE} < ./db/lista_compras.sql
       env:
         MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
         MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
