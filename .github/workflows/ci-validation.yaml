@@ -58,8 +58,7 @@ jobs:
 
     - name: Test application
       run: | 
-        curl -s http://localhost:3000
-        docker logs node-app
+        curl -s http://localhost:3000 ; docker logs node-app
     
     - name: Clean up
       if: always()
