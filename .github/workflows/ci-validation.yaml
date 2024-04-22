@@ -57,8 +57,11 @@ jobs:
         MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
 
     - name: Test application
-      run: | 
-        curl -s http://localhost:3000 ; docker logs node-app
+      run: curl -s http://localhost:3000
+        
+    - name: Get logs
+      if: always()
+      run: docker logs node-app
     
     - name: Clean up
       if: always()
