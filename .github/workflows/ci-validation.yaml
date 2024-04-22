@@ -56,6 +56,12 @@ jobs:
         MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
         MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
 
+    - name: Show MySQL
+      run: docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE} -e "show tables;"
+      env:
+        MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+        MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}    
+
     - name: Test application
       run: curl -s http://localhost:3000
         
