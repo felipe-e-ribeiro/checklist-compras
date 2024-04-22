@@ -22,7 +22,7 @@ jobs:
 
     - name: Start container App
       run: |
-        docker run -d --name node-app -p 3000:3000 --link mysql:db my_app
+        docker run -d --name node-app -p 3000:3000 -e MYSQL_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }} -e MYSQL_HOST=mysql -e MYSQL_DB=${{ vars.MYSQL_DATABASE }} --link mysql:db my_app
 
     - name: Wait for MySQL to be ready
       run: |
