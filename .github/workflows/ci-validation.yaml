@@ -27,7 +27,7 @@ jobs:
     - name: Wait for MySQL to be ready
       run: |
         end=$(($(date +%s) + 60))
-        until docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE}; select 1 from dual"; do
+        until docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "select 1 from dual"; do
           if [[ $(date +%s) -ge $end ]]; then
             echo "Database creation timed out."
             break
@@ -38,6 +38,11 @@ jobs:
           echo "Waiting for MySQL to be ready to create the database..."
           sleep 5
         done
+      env:
+        MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+
+    - name: Wait for MySQL to be ready
+      run: docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE}";
       env:
         MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
         MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
@@ -52,9 +57,10 @@ jobs:
         MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
 
     - name: Test application
-      run: |
-        sleep 10  # waiting for Node app to start up
-        curl -s http://localhost:3000
+      run: curl -s http://localhost:3000
+
+    - name: Get logs
+      run: docker logs node-app
     
     - name: Clean up
       if: always()
