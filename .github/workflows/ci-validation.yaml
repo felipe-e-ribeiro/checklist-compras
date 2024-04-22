@@ -38,9 +38,12 @@ jobs:
       env:
         MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
         MYSQL_DATABASE: ${{ env.MYSQL_DATABASE }}
+
+    - name: Import MySQL Database
+      run: docker cp db/lista_compras.sql mysql:/tmp
     
     - name: Populate MySQL Database
-      run: docker exec -i mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE}< db/lista_compras.sql
+      run: docker exec -it mysql bash -c "mysql -u root --password=${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE} < /tmp/lista_compras.sql"
       env:
         MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
         MYSQL_DATABASE: ${{ env.MYSQL_DATABASE }}
