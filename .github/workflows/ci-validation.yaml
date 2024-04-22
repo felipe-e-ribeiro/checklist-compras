@@ -28,8 +28,11 @@ jobs:
       run: |
         end=$(($(date +%s) + 60))
         until docker exec mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE}; select 1 from dual"; do
-          if [[ $(date +%s) -ge $end ]] || [[ $? == 1 ]]; then
+          if [[ $(date +%s) -ge $end ]]; then
             echo "Database creation timed out."
+            break
+          elif [[ $? == 0 ]]; then
+            echo "Database created"
             break
           fi
           echo "Waiting for MySQL to be ready to create the database..."
