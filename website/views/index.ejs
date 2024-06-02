@@ -3,16 +3,13 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
-    <!-- Seu CSS personalizado vem depois do Bootstrap -->
-    <link rel="stylesheet" href="./public/style.css">
-
     <title>Lista de Compras</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+    <script src="/socket.io/socket.io.js"></script>
     <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>    
 
     <button class="btn btn-outline-success my-2 my-sm-0" id="theme-toggle">Alternar Tema</button>
@@ -20,41 +17,100 @@
         <h1 class="mt-5">Lista de Compras</h1>
         <div class="row">
             <div class="col-sm-12 col-md-6">
-                <form action="/add" method="POST" class="form-inline my-2 my-lg-0">
-                    <input class="form-control mr-sm-2" type="text" name="item" placeholder="Adicionar item" required>
+                <form id="add-form" method="POST" action="/add" class="form-inline my-2 my-lg-0">
+                    <input class="form-control mr-sm-2" type="text" id="item-input" name="item" placeholder="Adicionar item" required>
                     <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Adicionar</button>
                 </form>
             </div>
             <div class="col-sm-12 col-md-6">
-                <form action="/clear-checked" method="POST">
+                <form id="clear-form" method="POST" action="/clear-checked">
                     <button class="btn btn-outline-danger my-2 my-sm-0" type="submit">Limpar Itens Concluídos</button>
                 </form>
             </div>
         </div>
 
-        <ul class="list-group mt-3">
+        <ul class="list-group mt-3" id="item-list">
+            <li class="list-group-header">
+                <div class="sort-buttons">
+                    <button class="btn btn-primary sort-button" data-sort="item">Alfabética</button>
+                    <button class="btn btn-primary sort-button" data-sort="checked">Checado</button>
+                </div>
+            </li>
             <% items.forEach(function(item) { %>
-                <li class="list-group-item">
-                    <form action="/check" method="POST" class="form-inline my-2 my-lg-0" style="display: inline">
-                        <input class="form-control mr-sm-2" type="checkbox" name="checked" onchange="this.form.submit()" <%= item.checked ? 'checked' : '' %>>
-                        <input class="form-control mr-sm-2" type="hidden" name="id" value="<%= item.id %>">
-                    </form>
+                <li class="list-group-item" data-id="<%= item.id %>">
+                    <input class="form-control mr-sm-2" type="checkbox" name="checked" onchange="checkItem(<%= item.id %>, this.checked)" <%= item.checked ? 'checked' : '' %>>
                     <%= item.item %>
                 </li>
             <% }); %>
         </ul>
     </div>
 
-    
     <script>
+        const socket = io();
+
+        socket.on('item-added', (data) => {
+            console.log('Item adicionado:', data);
+            const itemList = document.getElementById('item-list');
+            const newItem = document.createElement('li');
+            newItem.className = 'list-group-item';
+            newItem.dataset.id = data.id;
+            newItem.innerHTML = `
+                <input class="form-control mr-sm-2" type="checkbox" name="checked" onchange="checkItem(${data.id}, this.checked)">
+                ${data.item}
+            `;
+            itemList.appendChild(newItem);
+        });
+
+        socket.on('item-checked', (data) => {
+            console.log('Item checado:', data);
+            const item = document.querySelector(`li[data-id="${data.id}"] input[name="checked"]`);
+            if (item) {
+                item.checked = data.checked ? true : false;
+            }
+        });
+
+        socket.on('items-cleared', () => {
+            console.log('Itens concluídos limpos');
+            const items = document.querySelectorAll('li.list-group-item');
+            items.forEach(item => {
+                if (item.querySelector('input[name="checked"]').checked) {
+                    item.remove();
+                }
+            });
+        });
+
+        function checkItem(id, checked) {
+            fetch('/check', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: new URLSearchParams({
+                    id: id,
+                    checked: checked ? 'on' : 'off'
+                })
+            }).then(response => {
+                if (response.ok) {
+                    console.log(`Item ${id} atualizado para ${checked ? 'checado' : 'não checado'}`); // Log da resposta
+                }
+            });
+        }
+
+        document.querySelectorAll('.sort-button').forEach((button) => {
+            button.addEventListener('click', function() {
+                const sortBy = this.getAttribute('data-sort');
+                window.location.href = `/?sortBy=${sortBy}`;
+            });
+        });
+
         // Detecta o tema preferido do sistema
         const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)").matches;
         const currentTheme = localStorage.getItem("theme") ? localStorage.getItem("theme") : prefersDarkScheme ? "dark" : "light";
         document.documentElement.setAttribute("data-theme", currentTheme);
-    
+
         // Aplica o tema correto aos botões ao carregar a página
         updateButtonClasses(currentTheme);
-    
+
         const themeToggleBtn = document.getElementById("theme-toggle");
         themeToggleBtn.addEventListener("click", function() {
             let theme = document.documentElement.getAttribute("data-theme");
@@ -67,11 +123,11 @@
             }
             document.documentElement.setAttribute("data-theme", theme);
             localStorage.setItem("theme", theme); // Salva o tema escolhido no localStorage
-    
+
             // Atualiza as classes dos botões conforme o tema
             updateButtonClasses(theme);
         });
-    
+
         function updateButtonClasses(theme) {
             document.querySelectorAll('button').forEach(button => {
                 if (theme === "dark") {
@@ -84,7 +140,5 @@
             });
         }
     </script>
-    
-    
 </body>
 </html>

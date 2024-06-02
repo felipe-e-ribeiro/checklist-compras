@@ -51,3 +51,22 @@ button {
 .form-container input[type="text"] {
     margin-right: 5px;
 }
+
+/* public/style.css */
+.sort-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.sort-buttons .btn {
+    flex: 1;
+    margin: 0 5px;
+}
+
+.list-group-header {
+    background-color: var(--background-color);
+    color: var(--button-text-color);
+    display: block
+}
