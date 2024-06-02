@@ -1,0 +1,76 @@
+name: Multiarch Docker Build
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  check-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag-check.outputs.tag }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      
+      - name: Check for tag
+        id: tag-check
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          if [ -z "$TAG_NAME" ]; then
+            echo "::error::No tag found on this commit."
+            exit 1
+          fi
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+
+  build-and-push:
+    needs: check-tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: feliperibeiro95/checklist-compras:${{ needs.check-tag.outputs.tag }}
+          platforms: linux/amd64,linux/arm64
+          
+  check-tag-local:
+    needs: build-and-push
+    runs-on: self-hosted
+    outputs:
+      tag: ${{ steps.tag-check-local.outputs.tag }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+        
+      - name: Check for tag
+        id: tag-check-local
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          if [ -z "$TAG_NAME" ]; then
+            echo "::error::No tag found on this commit."
+            exit 1
+          fi
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          
+      - name: Check for tag
+        run: echo $GITHUB_OUTPUT >> test.out2
+      - name: Check for tag2
+        run: echo $TAG_NAME >> test.out
+
+  deploy:
+    needs: check-tag-local
+    runs-on: self-hosted
+    steps:
+      - name: Change deployment image
+        run: kubectl set image deployment/lista-compras-app lista-compras-app=feliperibeiro95/checklist-compras:${{ needs.check-tag-local.outputs.tag }}
