@@ -1,36 +1,49 @@
 const express = require('express');
-const app = express();
+const session = require('express-session');
+const RedisStore = require('connect-redis').default;
+const { createClient } = require('redis');
 const bodyParser = require('body-parser');
 const mysql = require('mysql2');
 const path = require('path');
 const http = require('http');
-const server = http.createServer(app);
+const { Server } = require('socket.io');
+const { createAdapter } = require('@socket.io/redis-adapter');
 
-const { Server } = require("socket.io");
+const app = express();
+const server = http.createServer(app);
 const io = new Server(server);
 
-const redis = require('redis');
-const redisAdapter = require('socket.io-redis');
-
 // Configuração do Redis
-const pubClient = redis.createClient({ host: 'redis', port: 6379 });
-const subClient = pubClient.duplicate();
-
-pubClient.on('error', (err) => {
-    console.error('Error connecting to Redis (pubClient):', err);
-});
-pubClient.on('connect', () => {
-    console.log('Connected to Redis (pubClient)');
+const redisClient = createClient({
+    url: 'redis://localhost:6379'  // ajuste a URL conforme necessário
 });
 
-subClient.on('error', (err) => {
-    console.error('Error connecting to Redis (subClient):', err);
-});
-subClient.on('connect', () => {
-    console.log('Connected to Redis (subClient)');
+redisClient.on('error', (err) => {
+    console.error('Error connecting to Redis:', err);
 });
 
-io.adapter(redisAdapter({ pubClient, subClient }));
+redisClient.on('connect', () => {
+    console.log('Connected to Redis');
+});
+
+(async () => {
+    await redisClient.connect();
+
+    // Configuração do adaptador do Socket.IO com Redis
+    const pubClient = redisClient.duplicate();
+    const subClient = redisClient.duplicate();
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+    io.adapter(createAdapter(pubClient, subClient));
+})();
+
+// Configuração da sessão HTTP com Redis
+app.use(session({
+    store: new RedisStore({ client: redisClient }),
+    secret: 'seuSegredoAqui', // altere para uma chave secreta real
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false } // true se estiver usando HTTPS
+}));
 
 const db = mysql.createPool({
     host: process.env.MYSQL_HOST,
@@ -57,7 +70,7 @@ app.get('/', (req, res) => {
 
     let orderByClause;
     if (sortBy === 'checked') {
-        orderByClause = 'checked DESC, item ASC'; // Sort by 'checked' then 'item'
+        orderByClause = 'checked ASC, item ASC'; // Sort by 'checked' then 'item'
     } else {
         orderByClause = 'item ASC, checked DESC'; // Default: sort by 'item' then 'checked'
     }
@@ -74,7 +87,6 @@ app.post('/add', (req, res) => {
         if (err) throw err;
         const newItem = { id: result.insertId, item, checked: false };
         io.emit('item-added', newItem);
-        console.log('Emitting item-added event to Redis:', newItem);
         res.redirect('/');
     });
 });
@@ -86,7 +98,6 @@ app.post('/check', (req, res) => {
         if (err) throw err;
         const updatedItem = { id, checked: isChecked };
         io.emit('item-checked', updatedItem);
-        console.log('Emitting item-checked event to Redis:', updatedItem);
         res.redirect('/');
     });
 });
@@ -95,7 +106,6 @@ app.post('/clear-checked', (req, res) => {
     db.query('DELETE FROM items WHERE checked = 1', (err, result) => {
         if (err) throw err;
         io.emit('items-cleared');
-        console.log('Emitting items-cleared event to Redis');
         res.redirect('/');
     });
 });
