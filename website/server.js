@@ -14,7 +14,22 @@ const redisAdapter = require('socket.io-redis');
 
 // Configuração do Redis
 const pubClient = redis.createClient({ host: 'redis', port: 6379 });
-const subClient = redis.createClient({ host: 'redis', port: 6379 });
+const subClient = pubClient.duplicate();
+
+pubClient.on('error', (err) => {
+    console.error('Error connecting to Redis (pubClient):', err);
+});
+pubClient.on('connect', () => {
+    console.log('Connected to Redis (pubClient)');
+});
+
+subClient.on('error', (err) => {
+    console.error('Error connecting to Redis (subClient):', err);
+});
+subClient.on('connect', () => {
+    console.log('Connected to Redis (subClient)');
+});
+
 io.adapter(redisAdapter({ pubClient, subClient }));
 
 const db = mysql.createPool({
@@ -57,7 +72,9 @@ app.post('/add', (req, res) => {
     const { item } = req.body;
     db.query('INSERT INTO items (item, checked) VALUES (?, false)', [item], (err, result) => {
         if (err) throw err;
-        io.emit('item-added', { id: result.insertId, item, checked: false });
+        const newItem = { id: result.insertId, item, checked: false };
+        io.emit('item-added', newItem);
+        console.log('Emitting item-added event to Redis:', newItem);
         res.redirect('/');
     });
 });
@@ -67,7 +84,9 @@ app.post('/check', (req, res) => {
     const isChecked = checked === 'on' ? 1 : 0;
     db.query('UPDATE items SET checked = ? WHERE id = ?', [isChecked, id], (err, result) => {
         if (err) throw err;
-        io.emit('item-checked', { id, checked: isChecked });
+        const updatedItem = { id, checked: isChecked };
+        io.emit('item-checked', updatedItem);
+        console.log('Emitting item-checked event to Redis:', updatedItem);
         res.redirect('/');
     });
 });
@@ -76,6 +95,7 @@ app.post('/clear-checked', (req, res) => {
     db.query('DELETE FROM items WHERE checked = 1', (err, result) => {
         if (err) throw err;
         io.emit('items-cleared');
+        console.log('Emitting items-cleared event to Redis');
         res.redirect('/');
     });
 });
