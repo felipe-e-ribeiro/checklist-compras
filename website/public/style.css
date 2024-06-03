@@ -70,3 +70,11 @@ button {
     color: var(--button-text-color);
     display: block
 }
+
+.list-group {
+  display: flex;
+  flex-direction: column;
+  border-radius: 25px;
+  padding-left: 0;
+  margin-bottom: 0;
+}
