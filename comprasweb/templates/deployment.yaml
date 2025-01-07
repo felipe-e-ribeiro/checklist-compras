@@ -7,7 +7,7 @@ spec:
   replicas: {{ .Values.comprasweb.replicaCount }}
   selector:
     matchLabels:
-      app: "{{ .Values.comprasweb.serviceName }}-{{ .Values.env }}"
+      app: "{{ .Values.comprasweb.serviceName }}"
   template:
     metadata:
       labels:
