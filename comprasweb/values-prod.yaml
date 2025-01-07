@@ -1,5 +1,6 @@
 namespace: "comprasweb"
 env: "prod"
+redishost: "redix.redis-cluster.svc.cluster.local"
 
 comprasweb:
   replicaCount: 1

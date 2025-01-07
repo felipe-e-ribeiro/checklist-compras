@@ -26,6 +26,8 @@ spec:
             - containerPort: {{ .Values.comprasweb.port }}
               protocol: TCP
           env:
+          - name: REDIS_HOST
+            value: {{ .Values.redishost }}
           - name: MYSQL_HOST
             valueFrom:
               secretKeyRef:

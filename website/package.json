@@ -1,24 +1,22 @@
 {
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
+    "body-parser": "^1.20.2",
     "connect-redis": "^7.1.1",
     "ejs": "^3.1.9",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
-    "mysql": "^2.18.1",
+    "ioredis": "^5.3.2",
     "mysql2": "^3.9.3",
     "redis": "^4.6.14",
-    "socket.io": "^4.7.5",
-    "socket.io-redis": "^6.1.1",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7"
+    "socket.io": "^4.7.5"
   },
   "scripts": {
     "start": "node server.js"
   },
   "name": "website",
   "version": "1.0.0",
-  "main": "db.js",
+  "main": "server.js",
   "author": "",
   "license": "ISC",
   "description": ""

@@ -1,7 +1,7 @@
 const express = require('express');
 const session = require('express-session');
 const RedisStore = require('connect-redis').default;
-const { createClient } = require('redis');
+const Redis = require('ioredis');
 const bodyParser = require('body-parser');
 const mysql = require('mysql2');
 const path = require('path');
@@ -13,33 +13,34 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Configuração do Redis
-const redisClient = createClient({
-    url: 'redis://localhost:6379'  // ajuste a URL conforme necessário
-});
+// Configuração do Redis Cluster
+const redisClient = new Redis.Cluster([
+    {
+        host: process.env.REDIS_HOST,
+        port: 6379
+    }
+]);
 
 redisClient.on('error', (err) => {
-    console.error('Error connecting to Redis:', err);
+    console.error('Error connecting to Redis Cluster:', err);
 });
 
 redisClient.on('connect', () => {
-    console.log('Connected to Redis');
+    console.log('Connected to Redis Cluster');
 });
 
+// Configuração do adaptador do Socket.IO com Redis Cluster
 (async () => {
-    await redisClient.connect();
-
-    // Configuração do adaptador do Socket.IO com Redis
     const pubClient = redisClient.duplicate();
     const subClient = redisClient.duplicate();
     await Promise.all([pubClient.connect(), subClient.connect()]);
     io.adapter(createAdapter(pubClient, subClient));
 })();
 
-// Configuração da sessão HTTP com Redis
+// Configuração da sessão HTTP com Redis Cluster
 app.use(session({
     store: new RedisStore({ client: redisClient }),
-    secret: 'seuSegredoAqui', // altere para uma chave secreta real
+    secret: 'seuSegredoAqui', // Alterar para uma chave secreta real
     resave: false,
     saveUninitialized: false,
     cookie: { secure: false } // true se estiver usando HTTPS
