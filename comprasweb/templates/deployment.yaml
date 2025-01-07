@@ -18,7 +18,7 @@ spec:
       containers:
         - name: "{{ .Values.comprasweb.serviceName }}-{{ .Values.env }}"
           image: "{{ .Values.comprasweb.image.repository }}:{{ .Values.comprasweb.image.tag }}"
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           env:
             - name: VERSION
               value: "{{ .Values.comprasweb.image.tag }}"
