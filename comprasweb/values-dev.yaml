@@ -5,7 +5,7 @@ comprasweb:
   replicaCount: 1
   image:
     repository: feliperibeiro95/lista-compras
-    tag: "V2.2.1"
+    tag: "latest"
   port: 3000
   serviceName: comprasweb-dev
   dbaccess:
