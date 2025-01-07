@@ -1,7 +1,7 @@
 const express = require('express');
 const session = require('express-session');
 const RedisStore = require('connect-redis').default;
-const Redis = require('ioredis');
+const { createClient } = require('redis');
 const bodyParser = require('body-parser');
 const mysql = require('mysql2');
 const path = require('path');
@@ -13,46 +13,60 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Configuração do Redis Cluster
-const redisClient = new Redis.Cluster([
-    {
-        host: process.env.REDIS_HOST,
-        port: 6379
-    }
-]);
+// Configuração do Redis
+const redisClient = createClient({
+    url: process.env.REDIS_HOST || 'redis://localhost:6379', // Use variável de ambiente para o Redis
+});
 
+// Lidando com eventos do Redis
 redisClient.on('error', (err) => {
-    console.error('Error connecting to Redis Cluster:', err);
+    console.error('Error connecting to Redis:', err);
 });
 
 redisClient.on('connect', () => {
-    console.log('Connected to Redis Cluster');
+    console.log('Connected to Redis');
 });
 
-// Configuração do adaptador do Socket.IO com Redis Cluster
+// Configurando o Redis e o adaptador do Socket.IO
 (async () => {
-    const pubClient = redisClient.duplicate();
-    const subClient = redisClient.duplicate();
-    await Promise.all([pubClient.connect(), subClient.connect()]);
-    io.adapter(createAdapter(pubClient, subClient));
+    try {
+        // Crie duplicatas para o adaptador
+        const pubClient = redisClient.duplicate();
+        const subClient = redisClient.duplicate();
+        await Promise.all([pubClient.connect(), subClient.connect()]);
+
+        // Configure o adaptador do Socket.IO
+        io.adapter(createAdapter(pubClient, subClient));
+
+        // Conecte o cliente principal para sessões
+        if (!redisClient.isOpen) {
+            await redisClient.connect();
+        }
+
+        console.log('Redis clients and adapter configured successfully.');
+    } catch (err) {
+        console.error('Error setting up Redis clients:', err);
+    }
 })();
 
-// Configuração da sessão HTTP com Redis Cluster
+// Configuração da sessão HTTP com Redis
 app.use(session({
     store: new RedisStore({ client: redisClient }),
-    secret: 'seuSegredoAqui', // Alterar para uma chave secreta real
+    secret: process.env.SESSION_SECRET || 'seuSegredoAqui', // Use variável de ambiente para o segredo
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false } // true se estiver usando HTTPS
+    cookie: { secure: false }, // Use "true" se estiver usando HTTPS
 }));
 
+// Configuração do MySQL
 const db = mysql.createPool({
     host: process.env.MYSQL_HOST,
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
-    database: process.env.MYSQL_DATABASE || 'lista_compras'
+    database: process.env.MYSQL_DATABASE || 'lista_compras',
 });
 
+// Configuração do Socket.IO
 io.on('connection', (socket) => {
     console.log('New client connected');
     socket.on('disconnect', () => {
@@ -60,20 +74,22 @@ io.on('connection', (socket) => {
     });
 });
 
+// Middleware e configurações do Express
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// Rotas
 app.get('/', (req, res) => {
-    const sortBy = req.query.sortBy || 'item'; // Default sort by 'item' (alphabetical)
-    const sortOrder = req.query.sortOrder || 'ASC'; // Default sort order 'ASC'
+    const sortBy = req.query.sortBy || 'item';
+    const sortOrder = req.query.sortOrder || 'ASC';
 
     let orderByClause;
     if (sortBy === 'checked') {
-        orderByClause = 'checked ASC, item ASC'; // Sort by 'checked' then 'item'
+        orderByClause = 'checked ASC, item ASC';
     } else {
-        orderByClause = 'item ASC, checked DESC'; // Default: sort by 'item' then 'checked'
+        orderByClause = 'item ASC, checked DESC';
     }
 
     db.query(`SELECT * FROM items ORDER BY ${orderByClause}`, (err, result) => {
@@ -111,6 +127,8 @@ app.post('/clear-checked', (req, res) => {
     });
 });
 
-server.listen(3000, () => {
-    console.log('Server running on http://0.0.0.0:3000');
+// Iniciando o servidor
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
