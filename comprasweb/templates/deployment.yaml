@@ -22,13 +22,6 @@ spec:
           env:
             - name: VERSION
               value: "{{ .Values.comprasweb.image.tag }}"
-          livenessProbe:
-            exec:
-              command: {{ .Values.comprasweb.livenessProbe.execCommand | toJson }}
-            failureThreshold: {{ .Values.comprasweb.livenessProbe.failureThreshold }}
-            periodSeconds: {{ .Values.comprasweb.livenessProbe.periodSeconds }}
-            successThreshold: {{ .Values.comprasweb.livenessProbe.successThreshold }}
-            timeoutSeconds: {{ .Values.comprasweb.livenessProbe.timeoutSeconds }}
           ports:
             - containerPort: {{ .Values.comprasweb.port }}
               protocol: TCP
