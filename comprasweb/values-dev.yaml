@@ -1,7 +1,7 @@
 namespace: "comprasweb-dev"
 env: "dev"
 
-onepieceapp:
+comprasweb:
   replicaCount: 1
   image:
     repository: feliperibeiro95/lista-compras
