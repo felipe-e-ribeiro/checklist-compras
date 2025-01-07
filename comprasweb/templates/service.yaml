@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.comprasweb.serviceName }}-{{ .Values.env }}
+  name: "{{ .Values.comprasweb.serviceName }}-{{ .Values.env }}"
   namespace: {{ .Values.namespace }}
 spec:
   ports:

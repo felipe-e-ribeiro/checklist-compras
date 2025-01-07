@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.comprasweb.serviceName }}-{{ .Values.env }}
+  name: "{{ .Values.comprasweb.serviceName }}-{{ .Values.env }}"
   namespace: {{ .Values.namespace }}
 spec:
   replicas: {{ .Values.comprasweb.replicaCount }}
   selector:
     matchLabels:
-      app: {{ .Values.comprasweb.serviceName }}-{{ .Values.env }}
+      app: "{{ .Values.comprasweb.serviceName }}-{{ .Values.env }}"
   template:
     metadata:
       labels:
-        app: {{ .Values.comprasweb.serviceName | quote }}-{{ .Values.env }}
+        app: {{ .Values.comprasweb.serviceName | quote }}
         version: {{ .Values.comprasweb.image.tag | quote }}
         web: "comprasweb"
     spec:
       containers:
-        - name: {{ .Values.comprasweb.serviceName }}-{{ .Values.env }}
+        - name: "{{ .Values.comprasweb.serviceName }}-{{ .Values.env }}"
           image: "{{ .Values.comprasweb.image.repository }}:{{ .Values.comprasweb.image.tag }}"
           imagePullPolicy: IfNotPresent
           env:
@@ -29,20 +29,20 @@ spec:
           - name: MYSQL_HOST
             valueFrom:
               secretKeyRef:
-                name: compras-db-secret-{{ .Values.env }}
+                name: "compras-db-secret-{{ .Values.env }}"
                 key: hostaddrdb
           - name: MYSQL_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: compras-db-secret-{{ .Values.env }}
+                name: "compras-db-secret-{{ .Values.env }}"
                 key: passwordb
           - name: MYSQL_DB
             valueFrom:
               secretKeyRef:
-                name: compras-db-secret-{{ .Values.env }}
+                name: "compras-db-secret-{{ .Values.env }}"
                 key: databasename
           - name: MYSQL_USER
             valueFrom:
               secretKeyRef:
-                name: compras-db-secret-{{ .Values.env }}
+                name: "compras-db-secret-{{ .Values.env }}"
                 key: usernamedb
