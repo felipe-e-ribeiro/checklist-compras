@@ -4,7 +4,7 @@ env: "dev"
 comprasweb:
   replicaCount: 1
   image:
-    repository: feliperibeiro95/lista-compras
+    repository: feliperibeiro95/checklist-compras
     tag: "latest"
   port: 3000
   serviceName: comprasweb-dev
