@@ -38,4 +38,4 @@ ingress:
     config:
       - hosts:
           - "compras-dev.felipeduribeiro.com.br"
-        secretName: onepiece-cert
+        secretName: comprasweb-dev-cert
