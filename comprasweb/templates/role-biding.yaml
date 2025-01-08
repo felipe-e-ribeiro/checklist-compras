@@ -1,0 +1,11 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Value.namespace }}-rbac
+  namespace: {{ .Values.namespace }}
+subjects:
+- kind: ServiceAccount
+  name: {{ .Value.namespace }}-rbac
+roleRef:
+  kind: Role
+  name: pod-reader

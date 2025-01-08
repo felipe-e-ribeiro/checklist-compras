@@ -15,6 +15,7 @@ spec:
         version: {{ .Values.comprasweb.image.tag | quote }}
         web: "comprasweb"
     spec:
+      serviceAccountName: {{ .Value.namespace }}-account
       containers:
         - name: "{{ .Values.comprasweb.serviceName }}-{{ .Values.env }}"
           image: "{{ .Values.comprasweb.image.repository }}:{{ .Values.comprasweb.image.tag }}"
