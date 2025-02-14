@@ -13,12 +13,15 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Middleware para suportar x-www-form-urlencoded e JSON
+app.use(bodyParser.urlencoded({ extended: true })); // Suporta formulários HTML
+app.use(bodyParser.json()); // Suporta JSON
+
 // Configuração do Redis
 const redisClient = createClient({
     url: process.env.REDIS_HOST || 'redis://localhost:6379', // Use variável de ambiente para o Redis
 });
 
-// Lidando com eventos do Redis
 redisClient.on('error', (err) => {
     console.error('Error connecting to Redis:', err);
 });
@@ -27,18 +30,14 @@ redisClient.on('connect', () => {
     console.log('Connected to Redis');
 });
 
-// Configurando o Redis e o adaptador do Socket.IO
 (async () => {
     try {
-        // Crie duplicatas para o adaptador
         const pubClient = redisClient.duplicate();
         const subClient = redisClient.duplicate();
         await Promise.all([pubClient.connect(), subClient.connect()]);
 
-        // Configure o adaptador do Socket.IO
         io.adapter(createAdapter(pubClient, subClient));
 
-        // Conecte o cliente principal para sessões
         if (!redisClient.isOpen) {
             await redisClient.connect();
         }
@@ -75,7 +74,6 @@ io.on('connection', (socket) => {
 });
 
 // Middleware e configurações do Express
-app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -100,11 +98,20 @@ app.get('/', (req, res) => {
 
 app.post('/add', (req, res) => {
     const { item } = req.body;
+    
+    if (!item) {
+        return res.status(400).json({ error: 'O campo item é obrigatório' });
+    }
+
     db.query('INSERT INTO items (item, checked) VALUES (?, false)', [item], (err, result) => {
-        if (err) throw err;
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Erro ao adicionar item' });
+        }
+
         const newItem = { id: result.insertId, item, checked: false };
         io.emit('item-added', newItem);
-        res.redirect('/');
+        res.status(201).json(newItem);
     });
 });
 
