@@ -111,9 +111,16 @@ app.post('/add', (req, res) => {
 
         const newItem = { id: result.insertId, item, checked: false };
         io.emit('item-added', newItem);
-        res.status(201).json(newItem);
+
+        // Verifica se a requisição aceita JSON ou HTML
+        if (req.accepts('html')) {
+            res.redirect('/'); // Redireciona para a página inicial se for um navegador
+        } else {
+            res.status(201).json(newItem); // Retorna JSON se for uma API
+        }
     });
 });
+
 
 app.post('/check', (req, res) => {
     const { id, checked } = req.body;
