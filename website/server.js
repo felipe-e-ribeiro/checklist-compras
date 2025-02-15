@@ -126,6 +126,16 @@ app.post('/check', (req, res) => {
     });
 });
 
+app.post('/check-item', (req, res) => {
+    db.query('SELECT item FROM items', (err, result) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Erro ao buscar itens' });
+        }
+        res.status(200).json(result);
+    });
+});
+
 app.post('/clear-checked', (req, res) => {
     db.query('DELETE FROM items WHERE checked = 1', (err, result) => {
         if (err) throw err;
