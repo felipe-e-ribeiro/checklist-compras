@@ -3,32 +3,27 @@ const session = require('express-session');
 const RedisStore = require('connect-redis').default;
 const { createClient } = require('redis');
 const bodyParser = require('body-parser');
-const mysql = require('mysql2');
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 const { createAdapter } = require('@socket.io/redis-adapter');
+const db = require('./db'); // <-- Importa knex
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Middleware para suportar x-www-form-urlencoded e JSON
-app.use(bodyParser.urlencoded({ extended: true })); // Suporta formulários HTML
-app.use(bodyParser.json()); // Suporta JSON
+// Middleware para suporte a formulários e JSON
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
 // Configuração do Redis
 const redisClient = createClient({
-    url: process.env.REDIS_HOST || 'redis://localhost:6379', // Use variável de ambiente para o Redis
+    url: process.env.REDIS_HOST || 'redis://localhost:6379',
 });
 
-redisClient.on('error', (err) => {
-    console.error('Error connecting to Redis:', err);
-});
-
-redisClient.on('connect', () => {
-    console.log('Connected to Redis');
-});
+redisClient.on('error', (err) => console.error('Redis error:', err));
+redisClient.on('connect', () => console.log('Connected to Redis'));
 
 (async () => {
     try {
@@ -42,116 +37,141 @@ redisClient.on('connect', () => {
             await redisClient.connect();
         }
 
-        console.log('Redis clients and adapter configured successfully.');
+        console.log('Redis clients and adapter configured.');
     } catch (err) {
         console.error('Error setting up Redis clients:', err);
     }
 })();
 
-// Configuração da sessão HTTP com Redis
+// Sessão HTTP
 app.use(session({
     store: new RedisStore({ client: redisClient }),
-    secret: process.env.SESSION_SECRET || 'seuSegredoAqui', // Use variável de ambiente para o segredo
+    secret: process.env.SESSION_SECRET || 'seuSegredoAqui',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }, // Use "true" se estiver usando HTTPS
+    cookie: { secure: false },
 }));
 
-// Configuração do MySQL
-const db = mysql.createPool({
-    host: process.env.MYSQL_HOST,
-    user: process.env.MYSQL_USER,
-    password: process.env.MYSQL_PASSWORD,
-    database: process.env.MYSQL_DATABASE || 'lista_compras',
-});
-
-// Configuração do Socket.IO
+// Socket.IO
 io.on('connection', (socket) => {
     console.log('New client connected');
-    socket.on('disconnect', () => {
-        console.log('Client disconnected');
-    });
+    socket.on('disconnect', () => console.log('Client disconnected'));
 });
 
-// Middleware e configurações do Express
+// Express
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 // Rotas
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
     const sortBy = req.query.sortBy || 'item';
-    const sortOrder = req.query.sortOrder || 'ASC';
+    try {
+        const items = await db('items')
+            .where({ archived: false })
+            .orderBy([
+                sortBy === 'checked'
+                    ? { column: 'checked', order: 'asc' }
+                    : { column: 'item', order: 'asc' },
+                sortBy === 'checked'
+                    ? { column: 'item', order: 'asc' }
+                    : { column: 'checked', order: 'desc' }
+            ]);
 
-    let orderByClause;
-    if (sortBy === 'checked') {
-        orderByClause = 'checked ASC, item ASC';
-    } else {
-        orderByClause = 'item ASC, checked DESC';
+        res.render('index', { items, sortBy });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Erro ao buscar os itens' });
     }
-
-    db.query(`SELECT * FROM items ORDER BY ${orderByClause}`, (err, result) => {
-        if (err) throw err;
-        res.render('index', { items: result, sortBy });
-    });
 });
 
-app.post('/add', (req, res) => {
+app.post('/add', async (req, res) => {
     const { item } = req.body;
-    
+
     if (!item) {
         return res.status(400).json({ error: 'O campo item é obrigatório' });
     }
 
-    db.query('INSERT INTO items (item, checked) VALUES (?, false)', [item], (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ error: 'Erro ao adicionar item' });
-        }
+    try {
+        const [id] = await db('items').insert({ item, checked: false }).returning('id');
+        const newItem = { id: id.id || id, item, checked: false };
 
-        const newItem = { id: result.insertId, item, checked: false };
         io.emit('item-added', newItem);
 
-        // Verifica se a requisição aceita JSON ou HTML
         if (req.accepts('html')) {
-            res.redirect('/'); // Redireciona para a página inicial se for um navegador
+            res.redirect('/');
         } else {
-            res.status(201).json(newItem); // Retorna JSON se for uma API
+            res.status(201).json(newItem);
         }
-    });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Erro ao adicionar item' });
+    }
 });
 
-
-app.post('/check', (req, res) => {
+app.post('/check', async (req, res) => {
     const { id, checked } = req.body;
-    const isChecked = checked === 'on' ? 1 : 0;
-    db.query('UPDATE items SET checked = ? WHERE id = ?', [isChecked, id], (err, result) => {
-        if (err) throw err;
-        const updatedItem = { id, checked: isChecked };
-        io.emit('item-checked', updatedItem);
+    const isChecked = checked === 'on' ? true : false;
+
+    try {
+        await db('items').where({ id }).update({ checked: isChecked });
+        io.emit('item-checked', { id, checked: isChecked });
         res.redirect('/');
-    });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Erro ao atualizar item' });
+    }
 });
 
-app.post('/check-item', (req, res) => {
-    db.query('SELECT item FROM items', (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ error: 'Erro ao buscar itens' });
-        }
-        res.status(200).json(result);
-    });
+app.post('/check-item', async (req, res) => {
+    try {
+        const items = await db('items').select('item');
+        res.status(200).json(items);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Erro ao buscar itens' });
+    }
 });
 
-app.post('/clear-checked', (req, res) => {
-    db.query('DELETE FROM items WHERE checked = 1', (err, result) => {
-        if (err) throw err;
+app.post('/check-archived', async (req, res) => {
+    try {
+        const items = await db('items').select('item').where({ archived: true });
+        res.status(200).json(items);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Erro ao buscar itens' });
+    }
+});
+
+app.post('/clear-all', async (req, res) => {
+    try {
+        await db('items').where({ checked: true }).del();
         io.emit('items-cleared');
         res.redirect('/');
-    });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Erro ao limpar itens' });
+    }
 });
 
-// Iniciando o servidor
+app.post('/clear-checked', async (req, res) => {
+    try {
+        await db('items')
+            .where({ checked: true })
+            .update({
+                archived: true,
+                archived_at: db.fn.now()
+            });
+
+        io.emit('item-checked');
+        res.redirect('/');
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Erro ao arquivar os itens' });
+    }
+});
+
+// Start
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
