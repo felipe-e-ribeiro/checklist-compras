@@ -136,7 +136,7 @@ app.post('/check-item', async (req, res) => {
 app.post('/check-archived', async (req, res) => {
     try {
         const items = await db('items')
-            .select('item', 'date_archived')
+            .select('item', 'archived_at')
             .where({ archived: true });
 
         res.status(200).json(items);
