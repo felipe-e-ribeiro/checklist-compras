@@ -135,13 +135,32 @@ app.post('/check-item', async (req, res) => {
 
 app.post('/check-archived', async (req, res) => {
     try {
-        const items = await db('items').select('item').where({ archived: true });
+        const items = await db('items')
+            .select('item', 'date_archived')
+            .where({ archived: true });
+
         res.status(200).json(items);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Erro ao buscar itens' });
     }
 });
+
+app.delete('/remove-archived', async (req, res) => {
+    try {
+        const deletedCount = await db('items')
+            .where({ archived: true })
+            .del();
+
+        res.status(200).json({
+            message: `${deletedCount} item(ns) arquivado(s) removido(s) com sucesso.`,
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Erro ao remover itens arquivados' });
+    }
+});
+
 
 app.post('/clear-all', async (req, res) => {
     try {
