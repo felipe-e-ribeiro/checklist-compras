@@ -114,6 +114,18 @@ app.post('/check', async (req, res) => {
     const isChecked = checked === 'on' ? true : false;
 
     try {
+        // Primeiro, faz a chamada GET para o FQDN
+        const fqdnUrl = process.env.FQDN_URL;
+        const fqdnUser = process.env.FQDN_USER;
+        const fqdnPassword = process.env.FQDN_PASSWORD;
+
+        await axios.get(fqdnUrl, {
+            auth: {
+                username: fqdnUser,
+                password: fqdnPassword
+            }
+        });
+        
         await db('items').where({ id }).update({ checked: isChecked });
         io.emit('item-checked', { id, checked: isChecked });
         res.redirect('/');
@@ -135,19 +147,6 @@ app.post('/check-item', async (req, res) => {
 
 app.post('/check-archived', async (req, res) => {
     try {
-        // Primeiro, faz a chamada GET para o FQDN
-        const fqdnUrl = process.env.FQDN_URL;
-        const fqdnUser = process.env.FQDN_USER;
-        const fqdnPassword = process.env.FQDN_PASSWORD;
-
-        await axios.get(fqdnUrl, {
-            auth: {
-                username: fqdnUser,
-                password: fqdnPassword
-            }
-        });
-
-        // Depois consulta os itens arquivados no banco
         const items = await db('items')
             .select('item', 'archived_at')
             .where({ archived: true });
@@ -155,7 +154,7 @@ app.post('/check-archived', async (req, res) => {
         res.status(200).json(items);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Erro ao buscar itens ou fazer chamada externa' });
+        res.status(500).json({ error: 'Erro ao buscar itens arquivados' });
     }
 });
 
