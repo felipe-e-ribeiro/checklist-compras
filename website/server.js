@@ -207,21 +207,19 @@ app.post('/clear-checked', async (req, res) => {
         res.status(500).json({ error: 'Erro ao arquivar os itens' });
     }
     
-    // Primeiro, faz o GET para o FQDN
-    try {
-        await axios.get(fqdnUrl, {
-            auth: {
-                username: fqdnUser,
-                password: fqdnPassword
-            }
-        });
+   try {
+    await axios.get(fqdnUrl, {
+        auth: {
+            username: fqdnUser,
+            password: fqdnPassword
+        },
+        validateStatus: (status) => status >= 200 && status < 500
+    });
     } catch (err) {
-        console.error('Erro ao fazer a chamada externa:', err.message, err.response?.data || '');
-        // Decide se quer:
-        // 1. Continuar mesmo que a chamada externa falhe (não faz nada aqui)
-        // 2. OU já retornar erro 500 aqui
-        return res.status(500).json({ error: 'Erro ao fazer chamada externa' });
+    console.error('Erro ao fazer a chamada externa:', err.message, err.response?.data || '');
+    return res.status(500).json({ error: 'Erro ao fazer chamada externa' });
     }
+
 });
 
 // Start
