@@ -113,19 +113,7 @@ app.post('/check', async (req, res) => {
     const { id, checked } = req.body;
     const isChecked = checked === 'on' ? true : false;
 
-    try {
-        // Primeiro, faz a chamada GET para o FQDN
-        const fqdnUrl = process.env.FQDN_URL;
-        const fqdnUser = process.env.FQDN_USER;
-        const fqdnPassword = process.env.FQDN_PASSWORD;
-
-        await axios.get(fqdnUrl, {
-            auth: {
-                username: fqdnUser,
-                password: fqdnPassword
-            }
-        });
-        
+    try {     
         await db('items').where({ id }).update({ checked: isChecked });
         io.emit('item-checked', { id, checked: isChecked });
         res.redirect('/');
@@ -189,6 +177,15 @@ app.delete('/remove-archived', async (req, res) => {
 
 app.post('/clear-all', async (req, res) => {
     try {
+         const fqdnUrl = process.env.FQDN_URL;
+         const fqdnUser = process.env.FQDN_USER;
+         const fqdnPassword = process.env.FQDN_PASSWORD;
+         await axios.get(fqdnUrl, {
+             auth: {
+                 username: fqdnUser,
+                 password: fqdnPassword
+             }
+         });
         await db('items').where({ checked: true }).del();
         io.emit('items-cleared');
         res.redirect('/');
