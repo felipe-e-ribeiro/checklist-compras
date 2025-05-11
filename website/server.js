@@ -187,16 +187,12 @@ app.post('/clear-all', async (req, res) => {
 });
 
 app.post('/clear-checked', async (req, res) => {
+    const fqdnUrl = process.env.FQDN_URL;
+    const fqdnUser = process.env.FQDN_USER;
+    const fqdnPassword = process.env.FQDN_PASSWORD;
+
+    // Depois, atualiza o banco
     try {
-         const fqdnUrl = process.env.FQDN_URL;
-         const fqdnUser = process.env.FQDN_USER;
-         const fqdnPassword = process.env.FQDN_PASSWORD;
-         await axios.get(fqdnUrl, {
-             auth: {
-                 username: fqdnUser,
-                 password: fqdnPassword
-             }
-         });
         await db('items')
             .where({ checked: true })
             .update({
@@ -207,8 +203,24 @@ app.post('/clear-checked', async (req, res) => {
         io.emit('item-checked');
         res.redirect('/');
     } catch (err) {
-        console.error(err);
+        console.error('Erro ao arquivar os itens:', err.message);
         res.status(500).json({ error: 'Erro ao arquivar os itens' });
+    }
+    
+    // Primeiro, faz o GET para o FQDN
+    try {
+        await axios.get(fqdnUrl, {
+            auth: {
+                username: fqdnUser,
+                password: fqdnPassword
+            }
+        });
+    } catch (err) {
+        console.error('Erro ao fazer a chamada externa:', err.message, err.response?.data || '');
+        // Decide se quer:
+        // 1. Continuar mesmo que a chamada externa falhe (não faz nada aqui)
+        // 2. OU já retornar erro 500 aqui
+        return res.status(500).json({ error: 'Erro ao fazer chamada externa' });
     }
 });
 
