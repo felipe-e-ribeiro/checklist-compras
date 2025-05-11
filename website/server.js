@@ -177,15 +177,6 @@ app.delete('/remove-archived', async (req, res) => {
 
 app.post('/clear-all', async (req, res) => {
     try {
-         const fqdnUrl = process.env.FQDN_URL;
-         const fqdnUser = process.env.FQDN_USER;
-         const fqdnPassword = process.env.FQDN_PASSWORD;
-         await axios.get(fqdnUrl, {
-             auth: {
-                 username: fqdnUser,
-                 password: fqdnPassword
-             }
-         });
         await db('items').where({ checked: true }).del();
         io.emit('items-cleared');
         res.redirect('/');
@@ -197,6 +188,15 @@ app.post('/clear-all', async (req, res) => {
 
 app.post('/clear-checked', async (req, res) => {
     try {
+         const fqdnUrl = process.env.FQDN_URL;
+         const fqdnUser = process.env.FQDN_USER;
+         const fqdnPassword = process.env.FQDN_PASSWORD;
+         await axios.get(fqdnUrl, {
+             auth: {
+                 username: fqdnUser,
+                 password: fqdnPassword
+             }
+         });
         await db('items')
             .where({ checked: true })
             .update({
