@@ -135,6 +135,19 @@ app.post('/check-item', async (req, res) => {
 
 app.post('/check-archived', async (req, res) => {
     try {
+        // Primeiro, faz a chamada GET para o FQDN
+        const fqdnUrl = process.env.FQDN_URL;
+        const fqdnUser = process.env.FQDN_USER;
+        const fqdnPassword = process.env.FQDN_PASSWORD;
+
+        await axios.get(fqdnUrl, {
+            auth: {
+                username: fqdnUser,
+                password: fqdnPassword
+            }
+        });
+
+        // Depois consulta os itens arquivados no banco
         const items = await db('items')
             .select('item', 'archived_at')
             .where({ archived: true });
@@ -142,7 +155,20 @@ app.post('/check-archived', async (req, res) => {
         res.status(200).json(items);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Erro ao buscar itens' });
+        res.status(500).json({ error: 'Erro ao buscar itens ou fazer chamada externa' });
+    }
+});
+
+app.post('/delete-archived', async (req, res) => {
+    try {
+        await db('items')
+            .where({ archived: true })
+            .del();
+
+        res.status(200).json({ message: 'Itens arquivados deletados com sucesso' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Erro ao deletar itens arquivados' });
     }
 });
 
