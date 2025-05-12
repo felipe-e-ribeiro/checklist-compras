@@ -5,6 +5,7 @@ const { createClient } = require('redis');
 const bodyParser = require('body-parser');
 const path = require('path');
 const http = require('http');
+const axios = require('axios');
 const { Server } = require('socket.io');
 const { createAdapter } = require('@socket.io/redis-adapter');
 const db = require('./db'); // <-- Importa knex
