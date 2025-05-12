@@ -204,8 +204,8 @@ app.get('/trigger-webhook', async (req, res) => {
         console.log('Webhook chamado com sucesso:', response.status);
         res.status(200).json({ message: 'Webhook chamado com sucesso', status: response.status });
     } catch (err) {
-        console.error('Erro ao chamar o webhook:', err.message, err.response?.data || '');
-        res.status(500).json({ error: 'Erro ao chamar o webhook' });
+    console.error('Erro ao chamar o webhook:', err.message, err.response?.data || '');
+    res.status(500).json({ error: err.message, details: err.response?.data || '' });
     }
 });
 
