@@ -186,6 +186,29 @@ app.post('/clear-all', async (req, res) => {
     }
 });
 
+// Nova rota apenas para chamar o webhook
+app.get('/trigger-webhook', async (req, res) => {
+    const fqdnUrl = process.env.FQDN_URL;
+    const fqdnUser = process.env.FQDN_USER;
+    const fqdnPassword = process.env.FQDN_PASSWORD;
+
+    try {
+        const response = await axios.get(fqdnUrl, {
+            auth: {
+                username: fqdnUser,
+                password: fqdnPassword
+            },
+            validateStatus: (status) => status >= 200 && status < 500 // Para não dar erro se for 404
+        });
+
+        console.log('Webhook chamado com sucesso:', response.status);
+        res.status(200).json({ message: 'Webhook chamado com sucesso', status: response.status });
+    } catch (err) {
+        console.error('Erro ao chamar o webhook:', err.message, err.response?.data || '');
+        res.status(500).json({ error: 'Erro ao chamar o webhook' });
+    }
+});
+
 app.post('/clear-checked', async (req, res) => {
     const fqdnUrl = process.env.FQDN_URL;
     const fqdnUser = process.env.FQDN_USER;
@@ -201,23 +224,12 @@ app.post('/clear-checked', async (req, res) => {
             });
 
         io.emit('item-checked');
+        // Primeiro, chama o /trigger-webhook
+        await axios.get(`http://localhost:${process.env.PORT || 3000}/trigger-webhook`);
         res.redirect('/');
     } catch (err) {
         console.error('Erro ao arquivar os itens:', err.message);
         res.status(500).json({ error: 'Erro ao arquivar os itens' });
-    }
-    
-   try {
-    await axios.get(fqdnUrl, {
-        auth: {
-            username: fqdnUser,
-            password: fqdnPassword
-        },
-        validateStatus: (status) => status >= 200 && status < 500
-    });
-    } catch (err) {
-    console.error('Erro ao fazer a chamada externa:', err.message, err.response?.data || '');
-    return res.status(500).json({ error: 'Erro ao fazer chamada externa' });
     }
 
 });
