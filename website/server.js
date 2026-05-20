@@ -92,7 +92,9 @@ async function setupRedisAdapter(io) {
 async function createServer(db) {
   const { app, requireAuth, requireTenant } = createApp(db);
   const server = http.createServer(app);
-  const io = new Server(server);
+  const io = new Server(server, {
+    transports: ['websocket'], // polling round-robina entre workers e fragmenta sessões
+  });
 
   io.use(async (socket, next) => {
     try {

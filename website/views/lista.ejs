@@ -229,7 +229,10 @@
     });
 
     // ── Socket.IO ─────────────────────────────────────────────────────
-    const socket = io({ auth: { tenantId: '<%= tenantId %>' } });
+    const socket = io({
+      transports: ['websocket'], // polling fragmenta sessão entre workers no cluster mode
+      auth: { tenantId: '<%= tenantId %>' },
+    });
     socket.on('item-added', (data) => {
       document.getElementById('empty-state')?.remove();
       const li = document.createElement('li');
