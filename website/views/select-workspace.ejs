@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+  <title>Selecionar Ambiente</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="container mt-5">
+    <h1>Selecionar Ambiente</h1>
+    <p>Olá, <%= user.email %>. Escolha um ambiente:</p>
+    <ul class="list-group mt-3">
+      <% tenants.forEach(function(tenant) { %>
+        <li class="list-group-item">
+          <form method="POST" action="/select-workspace" style="display:inline">
+            <input type="hidden" name="tenantId" value="<%= tenant.id %>">
+            <button type="submit" class="btn btn-link p-0">
+              <%= tenant.name %>
+              <% if (tenant.role === 'owner') { %><small class="text-muted">(dono)</small><% } %>
+            </button>
+          </form>
+        </li>
+      <% }); %>
+    </ul>
+    <a href="/create-workspace" class="btn btn-outline-success mt-3">+ Criar novo ambiente</a>
+  </div>
+</body>
+</html>

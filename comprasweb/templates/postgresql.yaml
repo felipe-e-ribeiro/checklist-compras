@@ -1,0 +1,81 @@
+{{- if .Values.postgresql.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "{{ .Release.Name }}-postgresql-pvc"
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.postgresql.storage | default "1Gi" }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: "{{ .Release.Name }}-postgresql"
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: "{{ .Release.Name }}-postgresql"
+spec:
+  serviceName: "{{ .Release.Name }}-postgresql"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-postgresql"
+  template:
+    metadata:
+      labels:
+        app: "{{ .Release.Name }}-postgresql"
+    spec:
+      containers:
+        - name: postgresql
+          image: "postgres:16"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: "compras-app-secret-{{ .Values.env }}"
+                  key: db_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "compras-app-secret-{{ .Values.env }}"
+                  key: db_password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: "compras-app-secret-{{ .Values.env }}"
+                  key: db_name
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: "{{ .Release.Name }}-postgresql-pvc"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-postgresql"
+  namespace: {{ .Values.namespace }}
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: "{{ .Release.Name }}-postgresql"
+  type: ClusterIP
+{{- end }}

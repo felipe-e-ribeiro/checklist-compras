@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//mnt/host/c/Users/felipe/.agents/skills/**)",
+      "Bash(NODE_ENV=test DB_HOST=localhost DB_PORT=5433 DB_USER=test DB_PASSWORD=test DB_NAME=lista_compras_test JWT_SECRET=test-secret APP_URL=http://localhost:3000 GOOGLE_CLIENT_ID=test GOOGLE_CLIENT_SECRET=test GOOGLE_CALLBACK_URL=http://localhost:3000/auth/google/callback npx jest tests/integration/migrations.test.js --no-coverage)",
+      "Bash(NODE_ENV=test DB_HOST=localhost DB_PORT=5433 DB_USER=test DB_PASSWORD=test DB_NAME=lista_compras_test JWT_SECRET=test-secret APP_URL=http://localhost:3000 GOOGLE_CLIENT_ID=test GOOGLE_CLIENT_SECRET=test GOOGLE_CALLBACK_URL=http://localhost:3000/auth/google/callback node -e \"require\\('dotenv'\\).config\\({path:'.env.test'}\\); const {getTestDb,migrate,rollback} = require\\('./tests/helpers/dbSetup'\\); async function main\\(\\){ const db = getTestDb\\(\\); try { const r = await db.raw\\('SELECT 1 as ok'\\); console.log\\('DB OK', r.rows[0]\\); } catch\\(e\\) { console.error\\('DB ERROR', e.message\\); } await db.destroy\\(\\); } main\\(\\);\")"
+    ]
+  }
+}

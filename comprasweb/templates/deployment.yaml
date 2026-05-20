@@ -3,49 +3,77 @@ kind: Deployment
 metadata:
   name: "{{ .Values.comprasweb.serviceName }}-{{ .Values.env }}"
   namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.comprasweb.serviceName | quote }}
 spec:
   replicas: {{ .Values.comprasweb.replicaCount }}
   selector:
     matchLabels:
-      app: "{{ .Values.comprasweb.serviceName }}"
+      app: {{ .Values.comprasweb.serviceName | quote }}
   template:
     metadata:
       labels:
         app: {{ .Values.comprasweb.serviceName | quote }}
         version: {{ .Values.comprasweb.image.tag | quote }}
-        web: "comprasweb"
     spec:
       serviceAccountName: {{ .Values.namespace }}-account
       containers:
         - name: "{{ .Values.comprasweb.serviceName }}-{{ .Values.env }}"
           image: "{{ .Values.comprasweb.image.repository }}:{{ .Values.comprasweb.image.tag }}"
-          imagePullPolicy: Always
-          env:
-            - name: VERSION
-              value: "{{ .Values.comprasweb.image.tag }}"
+          imagePullPolicy: {{ .Values.comprasweb.image.pullPolicy | default "Always" }}
           ports:
             - containerPort: {{ .Values.comprasweb.port }}
               protocol: TCP
           env:
-          - name: REDIS_HOST
-            value: {{ .Values.redishost }}
-          - name: MYSQL_HOST
-            valueFrom:
-              secretKeyRef:
-                name: "compras-db-secret-{{ .Values.env }}"
-                key: hostaddrdb
-          - name: MYSQL_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: "compras-db-secret-{{ .Values.env }}"
-                key: passwordb
-          - name: MYSQL_DB
-            valueFrom:
-              secretKeyRef:
-                name: "compras-db-secret-{{ .Values.env }}"
-                key: databasename
-          - name: MYSQL_USER
-            valueFrom:
-              secretKeyRef:
-                name: "compras-db-secret-{{ .Values.env }}"
-                key: usernamedb
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "{{ .Values.comprasweb.port }}"
+            - name: DB_CLIENT
+              value: "pg"
+            - name: DB_HOST
+              value: "{{ .Release.Name }}-postgresql"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: "compras-app-secret-{{ .Values.env }}"
+                  key: db_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "compras-app-secret-{{ .Values.env }}"
+                  key: db_password
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: "compras-app-secret-{{ .Values.env }}"
+                  key: db_name
+            - name: REDIS_HOST
+              value: "redis://{{ .Release.Name }}-redis-master:6379"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: "compras-app-secret-{{ .Values.env }}"
+                  key: jwt_secret
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: "compras-app-secret-{{ .Values.env }}"
+                  key: google_client_id
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: "compras-app-secret-{{ .Values.env }}"
+                  key: google_client_secret
+            - name: GOOGLE_CALLBACK_URL
+              value: {{ .Values.comprasweb.googleCallbackUrl | quote }}
+            - name: APP_URL
+              value: {{ .Values.comprasweb.appUrl | quote }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.comprasweb.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5

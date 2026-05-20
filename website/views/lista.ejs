@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+  <title>Lista de Compras</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <script src="/socket.io/socket.io.js"></script>
+
+  <nav class="navbar navbar-expand navbar-light bg-light px-3">
+    <span class="navbar-brand">Lista de Compras</span>
+    <div class="ml-auto d-flex align-items-center">
+      <button class="btn btn-sm btn-outline-secondary mr-2" id="theme-toggle">Tema</button>
+      <span class="mr-3 text-muted small"><%= user.email %></span>
+      <form method="POST" action="/auth/logout" style="display:inline">
+        <button type="submit" class="btn btn-sm btn-outline-danger">Sair</button>
+      </form>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    <div class="row mb-3">
+      <div class="col-sm-12 col-md-6">
+        <form id="add-form" method="POST" action="/app/add" class="form-inline">
+          <input class="form-control mr-2" type="text" id="item-input" name="item" placeholder="Adicionar item" required>
+          <button class="btn btn-outline-success" type="submit">Adicionar</button>
+        </form>
+      </div>
+      <div class="col-sm-12 col-md-6 d-flex align-items-center">
+        <form method="POST" action="/app/clear-checked" class="mr-2">
+          <button class="btn btn-outline-danger" type="submit">Limpar Concluídos</button>
+        </form>
+        <button class="btn btn-outline-secondary" id="invite-btn">Convidar</button>
+      </div>
+    </div>
+
+    <ul class="list-group" id="item-list">
+      <li class="list-group-header">
+        <div class="sort-buttons">
+          <button class="btn btn-primary sort-button" data-sort="item">Alfabética</button>
+          <button class="btn btn-primary sort-button" data-sort="checked">Checado</button>
+        </div>
+      </li>
+      <% items.forEach(function(item) { %>
+        <li class="list-group-item" data-id="<%= item.id %>">
+          <input type="checkbox" name="checked" onchange="checkItem('<%= item.id %>', this.checked)" <%= item.checked ? 'checked' : '' %>>
+          <%= item.item %>
+        </li>
+      <% }); %>
+    </ul>
+  </div>
+
+  <script>
+    const socket = io({ auth: { tenantId: '<%= tenantId %>' } });
+
+    socket.on('item-added', (data) => {
+      const list = document.getElementById('item-list');
+      const li = document.createElement('li');
+      li.className = 'list-group-item';
+      li.dataset.id = data.id;
+      li.innerHTML = `<input type="checkbox" name="checked" onchange="checkItem('${data.id}', this.checked)"> ${data.item}`;
+      list.appendChild(li);
+    });
+
+    socket.on('item-checked', (data) => {
+      if (!data || !data.id) return;
+      const el = document.querySelector(`li[data-id="${data.id}"] input`);
+      if (el) el.checked = !!data.checked;
+    });
+
+    socket.on('items-cleared', () => {
+      document.querySelectorAll('li.list-group-item').forEach((li) => {
+        if (li.querySelector('input') && li.querySelector('input').checked) li.remove();
+      });
+    });
+
+    function checkItem(id, checked) {
+      fetch('/app/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ id, checked: checked ? 'on' : 'off' }),
+      });
+    }
+
+    document.querySelectorAll('.sort-button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        window.location.href = `/app?sortBy=${btn.getAttribute('data-sort')}`;
+      });
+    });
+
+    document.getElementById('invite-btn').addEventListener('click', async () => {
+      const res = await fetch('/workspace/invite', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        prompt('Compartilhe este link de convite:', data.inviteUrl);
+      }
+    });
+
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = localStorage.getItem('theme') || (prefersDark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+    });
+  </script>
+</body>
+</html>

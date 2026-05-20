@@ -1,242 +1,133 @@
+require('dotenv').config({ path: process.env.NODE_ENV === 'test' ? '.env.test' : '.env' });
+
 const express = require('express');
-const session = require('express-session');
-const RedisStore = require('connect-redis').default;
-const { createClient } = require('redis');
+const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const path = require('path');
 const http = require('http');
-const axios = require('axios');
 const { Server } = require('socket.io');
 const { createAdapter } = require('@socket.io/redis-adapter');
-const db = require('./db'); // <-- Importa knex
+const { createClient } = require('redis');
+const passport = require('passport');
+const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+const { makeRequireAuth, makeRequireTenant } = require('./middleware/auth');
+const makeAuthRouter = require('./routes/auth');
+const makeWorkspaceRouter = require('./routes/workspace');
+const makeItemsRouter = require('./routes/items');
+const authService = require('./services/authService');
 
-// Middleware para suporte a formulários e JSON
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+function createApp(db) {
+  const app = express();
 
-// Configuração do Redis
-const redisClient = createClient({
-    url: process.env.REDIS_HOST || 'redis://localhost:6379',
-});
+  app.use(bodyParser.urlencoded({ extended: true }));
+  app.use(bodyParser.json());
+  app.use(cookieParser());
+  app.use(express.static(path.join(__dirname, 'public')));
+  app.set('view engine', 'ejs');
+  app.set('views', path.join(__dirname, 'views'));
 
-redisClient.on('error', (err) => console.error('Redis error:', err));
-redisClient.on('connect', () => console.log('Connected to Redis'));
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: process.env.GOOGLE_CALLBACK_URL,
+      },
+      async (_accessToken, _refreshToken, profile, done) => {
+        try {
+          const email = profile.emails[0].value;
+          const googleId = profile.id;
+          const name = profile.displayName;
+          const avatarUrl = profile.photos && profile.photos[0] && profile.photos[0].value;
 
-(async () => {
-    try {
-        const pubClient = redisClient.duplicate();
-        const subClient = redisClient.duplicate();
-        await Promise.all([pubClient.connect(), subClient.connect()]);
-
-        io.adapter(createAdapter(pubClient, subClient));
-
-        if (!redisClient.isOpen) {
-            await redisClient.connect();
+          let user = await db('users').where({ google_id: googleId }).first();
+          if (!user) {
+            [user] = await db('users')
+              .insert({ google_id: googleId, email, name, avatar_url: avatarUrl })
+              .returning('*');
+          }
+          return done(null, user);
+        } catch (err) {
+          return done(err);
         }
+      }
+    )
+  );
 
-        console.log('Redis clients and adapter configured.');
-    } catch (err) {
-        console.error('Error setting up Redis clients:', err);
-    }
-})();
+  app.use(passport.initialize());
 
-// Sessão HTTP
-app.use(session({
-    store: new RedisStore({ client: redisClient }),
-    secret: process.env.SESSION_SECRET || 'seuSegredoAqui',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false },
-}));
+  const requireAuth = makeRequireAuth(db);
+  const requireTenant = makeRequireTenant(db);
 
-// Socket.IO
-io.on('connection', (socket) => {
-    console.log('New client connected');
-    socket.on('disconnect', () => console.log('Client disconnected'));
-});
+  app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
+  app.get('/', (req, res) => res.redirect('/select-workspace'));
 
-// Express
-app.use(express.static(path.join(__dirname, 'public')));
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+  return { app, requireAuth, requireTenant };
+}
 
-// Rotas
-app.get('/', async (req, res) => {
-    const sortBy = req.query.sortBy || 'item';
+function createServer(db) {
+  const { app, requireAuth, requireTenant } = createApp(db);
+  const server = http.createServer(app);
+  const io = new Server(server);
+
+  io.use(async (socket, next) => {
     try {
-        const items = await db('items')
-            .where({ archived: false })
-            .orderBy([
-                sortBy === 'checked'
-                    ? { column: 'checked', order: 'asc' }
-                    : { column: 'item', order: 'asc' },
-                sortBy === 'checked'
-                    ? { column: 'item', order: 'asc' }
-                    : { column: 'checked', order: 'desc' }
-            ]);
-
-        res.render('index', { items, sortBy });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Erro ao buscar os itens' });
+      const cookieHeader = socket.request.headers.cookie || '';
+      const cookies = Object.fromEntries(
+        cookieHeader.split(';').map((c) => {
+          const [k, ...v] = c.trim().split('=');
+          return [k.trim(), v.join('=')];
+        })
+      );
+      const token = cookies.access_token;
+      if (!token) return next(new Error('UNAUTHORIZED'));
+      const payload = authService.verifyAccessToken(token);
+      socket.tenantId = payload.tenantId;
+      next();
+    } catch {
+      next(new Error('UNAUTHORIZED'));
     }
-});
+  });
 
-app.post('/add', async (req, res) => {
-    const { item } = req.body;
+  io.on('connection', (socket) => {
+    if (socket.tenantId) socket.join(socket.tenantId);
+  });
 
-    if (!item) {
-        return res.status(400).json({ error: 'O campo item é obrigatório' });
-    }
+  setupRedisAdapter(io);
 
-    try {
-        const [id] = await db('items').insert({ item, checked: false }).returning('id');
-        const newItem = { id: id.id || id, item, checked: false };
+  app.use(makeAuthRouter(db));
+  app.use(makeWorkspaceRouter(db, requireAuth));
+  app.use(makeItemsRouter(db, requireAuth, requireTenant, io));
 
-        io.emit('item-added', newItem);
+  return server;
+}
 
-        if (req.accepts('html')) {
-            res.redirect('/');
-        } else {
-            res.status(201).json(newItem);
-        }
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Erro ao adicionar item' });
-    }
-});
+async function setupRedisAdapter(io) {
+  try {
+    const pubClient = createClient({ url: process.env.REDIS_HOST || 'redis://localhost:6379' });
+    const subClient = pubClient.duplicate();
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+    io.adapter(createAdapter(pubClient, subClient));
+  } catch (err) {
+    console.error('Redis adapter error:', err.message);
+  }
+}
 
-app.post('/check', async (req, res) => {
-    const { id, checked } = req.body;
-    const isChecked = checked === 'on' ? true : false;
+function createTestApp(db) {
+  const { app, requireAuth, requireTenant } = createApp(db);
+  const io = { to: () => ({ emit: () => {} }) };
+  app.use(makeAuthRouter(db));
+  app.use(makeWorkspaceRouter(db, requireAuth));
+  app.use(makeItemsRouter(db, requireAuth, requireTenant, io));
+  return app;
+}
 
-    try {     
-        await db('items').where({ id }).update({ checked: isChecked });
-        io.emit('item-checked', { id, checked: isChecked });
-        res.redirect('/');
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Erro ao atualizar item' });
-    }
-});
+if (require.main === module) {
+  const db = require('./db');
+  const PORT = process.env.PORT || 3000;
+  const server = createServer(db);
+  server.listen(PORT, () => console.log(`Server running on http://0.0.0.0:${PORT}`));
+}
 
-app.post('/check-item', async (req, res) => {
-    try {
-        const items = await db('items').select('item');
-        res.status(200).json(items);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Erro ao buscar itens' });
-    }
-});
-
-app.post('/check-archived', async (req, res) => {
-    try {
-        const items = await db('items')
-            .select('item', 'archived_at')
-            .where({ archived: true });
-
-        res.status(200).json(items);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Erro ao buscar itens arquivados' });
-    }
-});
-
-app.post('/delete-archived', async (req, res) => {
-    try {
-        await db('items')
-            .where({ archived: true })
-            .del();
-
-        res.status(200).json({ message: 'Itens arquivados deletados com sucesso' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Erro ao deletar itens arquivados' });
-    }
-});
-
-app.delete('/remove-archived', async (req, res) => {
-    try {
-        const deletedCount = await db('items')
-            .where({ archived: true })
-            .del();
-
-        res.status(200).json({
-            message: `${deletedCount} item(ns) arquivado(s) removido(s) com sucesso.`,
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Erro ao remover itens arquivados' });
-    }
-});
-
-
-app.post('/clear-all', async (req, res) => {
-    try {
-        await db('items').where({ checked: true }).del();
-        io.emit('items-cleared');
-        res.redirect('/');
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Erro ao limpar itens' });
-    }
-});
-
-// Nova rota apenas para chamar o webhook
-app.get('/trigger-webhook', async (req, res) => {
-    const fqdnUrl = process.env.FQDN_URL;
-    const fqdnUser = process.env.FQDN_USER;
-    const fqdnPassword = process.env.FQDN_PASSWORD;
-
-    try {
-        const response = await axios.get(fqdnUrl, {
-            auth: {
-                username: fqdnUser,
-                password: fqdnPassword
-            },
-            validateStatus: (status) => status >= 200 && status < 500 // Para não dar erro se for 404
-        });
-
-        console.log('Webhook chamado com sucesso:', response.status);
-        res.status(200).json({ message: 'Webhook chamado com sucesso', status: response.status });
-    } catch (err) {
-    console.error('Erro ao chamar o webhook:', err.message, err.response?.data || '');
-    res.status(500).json({ error: err.message, details: err.response?.data || '' });
-    }
-});
-
-app.post('/clear-checked', async (req, res) => {
-    const fqdnUrl = process.env.FQDN_URL;
-    const fqdnUser = process.env.FQDN_USER;
-    const fqdnPassword = process.env.FQDN_PASSWORD;
-
-    // Depois, atualiza o banco
-    try {
-        await db('items')
-            .where({ checked: true })
-            .update({
-                archived: true,
-                archived_at: db.fn.now()
-            });
-
-        io.emit('item-checked');
-        // Primeiro, chama o /trigger-webhook
-        await axios.get(`http://localhost:${process.env.PORT || 3000}/trigger-webhook`);
-        res.redirect('/');
-    } catch (err) {
-        console.error('Erro ao arquivar os itens:', err.message);
-        res.status(500).json({ error: 'Erro ao arquivar os itens' });
-    }
-
-});
-
-// Start
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
-});
+module.exports = { createApp: createTestApp };
