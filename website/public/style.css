@@ -838,6 +838,77 @@ h2.display {
 .invite-timer.expiring { color: var(--danger); }
 .invite-expired-msg { font-size: 13px; color: var(--text-muted); font-style: italic; }
 
+/* ── Item crítico ────────────────────────────────────────────────────── */
+.item-critical-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--border);
+  border-radius: 4px;
+  padding: 0;
+  transition: color var(--transition), transform var(--transition);
+}
+.item-critical-btn:hover { color: var(--text-muted); transform: scale(1.1); }
+.item-critical-btn.active { color: #DC2626; }
+[data-theme="dark"] .item-critical-btn.active { color: #F87171; }
+
+.item-row.critical {
+  background: #FEF2F2;
+  border-left: 3px solid rgba(220,38,38,.3);
+  padding-left: calc(16px - 3px); /* compensate the border */
+}
+[data-theme="dark"] .item-row.critical {
+  background: #2A1414;
+  border-left-color: rgba(248,113,113,.3);
+}
+.item-row.critical .item-text { color: var(--text); }
+.item-row.critical:hover { background: #FEE2E2; }
+[data-theme="dark"] .item-row.critical:hover { background: #331818; }
+
+/* ── Item quantidade ─────────────────────────────────────────────────── */
+.item-qty {
+  flex-shrink: 0;
+  width: 90px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--font-sans);
+  text-align: right;
+  transition: all var(--transition);
+  outline: none;
+  cursor: text;
+}
+.item-qty::placeholder { color: var(--border); font-style: italic; font-size: 11px; }
+.item-qty:hover { border-color: var(--border-light); background: var(--surface-alt); }
+.item-qty:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 0 0 2px var(--accent-light);
+  width: 110px;
+  text-align: left;
+}
+/* qty com valor mas sem foco: mostra levemente */
+.item-qty:not(:placeholder-shown):not(:focus) {
+  border-color: var(--border-light);
+  background: var(--surface-alt);
+}
+
+@media (max-width: 480px) {
+  .item-qty { width: 60px; }
+  .item-qty:focus { width: 80px; }
+}
+
 /* ── Scrollbar ───────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

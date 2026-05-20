@@ -141,7 +141,16 @@
           </li>
         <% } %>
         <% items.forEach(function(item) { %>
-          <li class="item-row" data-id="<%= item.id %>">
+          <li class="item-row <%= item.is_critical ? 'critical' : '' %>" data-id="<%= item.id %>">
+            <button class="item-critical-btn <%= item.is_critical ? 'active' : '' %>"
+                    aria-label="Marcar como crítico"
+                    aria-pressed="<%= item.is_critical %>">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" width="14" height="14">
+                <circle cx="8" cy="8" r="6.5"/>
+                <line x1="8" y1="5.5" x2="8" y2="8.5" stroke-linecap="round"/>
+                <circle cx="8" cy="10.5" r="0.7" fill="currentColor" stroke="none"/>
+              </svg>
+            </button>
             <label class="item-label">
               <input class="item-checkbox-input" type="checkbox" onchange="checkItem('<%= item.id %>', this.checked)" <%= item.checked ? 'checked' : '' %>>
               <span class="item-box">
@@ -151,6 +160,13 @@
               </span>
               <span class="item-text"><%= item.item %></span>
             </label>
+            <input class="item-qty"
+                   type="text"
+                   placeholder="qtd"
+                   maxlength="25"
+                   value="<%= item.quantity || '' %>"
+                   data-id="<%= item.id %>"
+                   aria-label="Quantidade">
           </li>
         <% }); %>
       </ul>
@@ -245,6 +261,13 @@
       li.className = 'item-row';
       li.dataset.id = data.id;
       li.innerHTML = `
+        <button class="item-critical-btn" aria-label="Marcar como crítico" aria-pressed="false">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" width="14" height="14">
+            <circle cx="8" cy="8" r="6.5"/>
+            <line x1="8" y1="5.5" x2="8" y2="8.5" stroke-linecap="round"/>
+            <circle cx="8" cy="10.5" r="0.7" fill="currentColor" stroke="none"/>
+          </svg>
+        </button>
         <label class="item-label">
           <input class="item-checkbox-input" type="checkbox" onchange="checkItem('${data.id}', this.checked)">
           <span class="item-box">
@@ -253,8 +276,31 @@
             </svg>
           </span>
           <span class="item-text">${data.item}</span>
-        </label>`;
+        </label>
+        <input class="item-qty" type="text" placeholder="qtd" maxlength="25" value="${data.quantity || ''}" data-id="${data.id}" aria-label="Quantidade">`;
       document.getElementById('item-list').appendChild(li);
+      initCriticalBtn(li.querySelector('.item-critical-btn'));
+      initQtyInput(li.querySelector('.item-qty'));
+    });
+
+    socket.on('item-updated', (data) => {
+      const row = document.querySelector(`.item-row[data-id="${data.id}"]`);
+      if (!row) return;
+      if (data.is_critical !== undefined) {
+        const already = row.classList.contains('critical') === data.is_critical;
+        if (!already) {
+          row.classList.toggle('critical', data.is_critical);
+          const btn = row.querySelector('.item-critical-btn');
+          if (btn) {
+            btn.classList.toggle('active', data.is_critical);
+            btn.setAttribute('aria-pressed', String(data.is_critical));
+          }
+        }
+      }
+      if (data.quantity !== undefined) {
+        const qty = row.querySelector('.item-qty');
+        if (qty && qty !== document.activeElement) qty.value = data.quantity || '';
+      }
     });
     socket.on('item-checked', (data) => {
       if (!data || !data.id) return;
@@ -281,6 +327,49 @@
         body: new URLSearchParams({ id, checked: checked ? 'on' : 'off' }),
       });
     }
+
+    // ── Item crítico ──────────────────────────────────────────────────
+    function initCriticalBtn(btn) {
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.item-row');
+        const id = row.dataset.id;
+        const isCritical = row.classList.contains('critical');
+        // Atualização optimista imediata
+        row.classList.toggle('critical', !isCritical);
+        btn.classList.toggle('active', !isCritical);
+        btn.setAttribute('aria-pressed', String(!isCritical));
+        // Persistir no servidor (Socket.IO notifica outros clientes)
+        fetch(`/app/item/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ is_critical: !isCritical }),
+        });
+      });
+    }
+    document.querySelectorAll('.item-critical-btn').forEach(initCriticalBtn);
+
+    // ── Quantidade ────────────────────────────────────────────────────
+    function initQtyInput(input) {
+      if (!input) return;
+      let saveTimer;
+      const save = () => {
+        clearTimeout(saveTimer);
+        const id = input.dataset.id;
+        const value = input.value.trim();
+        fetch(`/app/item/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ quantity: value }),
+        });
+      };
+      input.addEventListener('input', () => {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(save, 700);
+      });
+      input.addEventListener('blur', () => { clearTimeout(saveTimer); save(); });
+    }
+    document.querySelectorAll('.item-qty').forEach(initQtyInput);
 
     // ── Workspace dropdown ────────────────────────────────────────────
     const wsTrigger = document.getElementById('ws-trigger');

@@ -212,6 +212,59 @@ describe('POST /app/clear-checked', () => {
   });
 });
 
+describe('PATCH /app/item/:id', () => {
+  test('updates quantity with a value', async () => {
+    const item = await insertItem(tenantA.id, 'Arroz');
+    const res = await request(app)
+      .patch(`/app/item/${item.id}`)
+      .set('Cookie', [cookieA()])
+      .send({ quantity: '2kg' });
+    expect(res.status).toBe(200);
+    const rows = await readItems(tenantA.id, { id: item.id });
+    expect(rows[0].quantity).toBe('2kg');
+  });
+
+  test('clears quantity when sent as empty string', async () => {
+    const item = await insertItem(tenantA.id, 'Feijão');
+    await request(app)
+      .patch(`/app/item/${item.id}`)
+      .set('Cookie', [cookieA()])
+      .send({ quantity: '' });
+    const rows = await readItems(tenantA.id, { id: item.id });
+    expect(rows[0].quantity).toBeNull();
+  });
+
+  test('updates is_critical to true', async () => {
+    const item = await insertItem(tenantA.id, 'Leite');
+    const res = await request(app)
+      .patch(`/app/item/${item.id}`)
+      .set('Cookie', [cookieA()])
+      .send({ is_critical: true });
+    expect(res.status).toBe(200);
+    const rows = await readItems(tenantA.id, { id: item.id });
+    expect(rows[0].is_critical).toBe(true);
+  });
+
+  test('returns 400 when no updates provided', async () => {
+    const item = await insertItem(tenantA.id, 'Sal');
+    const res = await request(app)
+      .patch(`/app/item/${item.id}`)
+      .set('Cookie', [cookieA()])
+      .send({});
+    expect(res.status).toBe(400);
+  });
+
+  test('tenant B cannot update tenant A items (isolation)', async () => {
+    const item = await insertItem(tenantA.id, 'Protected');
+    await request(app)
+      .patch(`/app/item/${item.id}`)
+      .set('Cookie', [cookieB()])
+      .send({ quantity: 'hacked' });
+    const rows = await readItems(tenantA.id, { id: item.id });
+    expect(rows[0].quantity).toBeNull();
+  });
+});
+
 describe('POST /app/check-archived', () => {
   test('returns archived items of tenant only', async () => {
     const itemA = await insertItem(tenantA.id, 'Arch A');

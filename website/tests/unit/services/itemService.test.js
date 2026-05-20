@@ -99,6 +99,29 @@ describe('listArchived', () => {
   });
 });
 
+describe('updateItem', () => {
+  test('updates quantity to a value', async () => {
+    const item = await itemService.addItem(tenantA.id, 'Arroz', db);
+    await itemService.updateItem(tenantA.id, item.id, { quantity: '2kg' }, db);
+    const rows = await readItems(tenantA.id, { id: item.id });
+    expect(rows[0].quantity).toBe('2kg');
+  });
+
+  test('clears quantity when set to empty string', async () => {
+    const item = await itemService.addItem(tenantA.id, 'Feijão', db);
+    await itemService.updateItem(tenantA.id, item.id, { quantity: null }, db);
+    const rows = await readItems(tenantA.id, { id: item.id });
+    expect(rows[0].quantity).toBeNull();
+  });
+
+  test('updates is_critical to true', async () => {
+    const item = await itemService.addItem(tenantA.id, 'Leite', db);
+    await itemService.updateItem(tenantA.id, item.id, { is_critical: true }, db);
+    const rows = await readItems(tenantA.id, { id: item.id });
+    expect(rows[0].is_critical).toBe(true);
+  });
+});
+
 describe('deleteArchived', () => {
   test('deletes archived items of tenant only', async () => {
     await itemService.addItem(tenantA.id, 'Del', db);

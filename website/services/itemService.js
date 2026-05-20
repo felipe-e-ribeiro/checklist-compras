@@ -54,4 +54,10 @@ async function deleteArchived(tenantId, db) {
   );
 }
 
-module.exports = { listItems, addItem, checkItem, archiveChecked, listArchived, deleteArchived };
+async function updateItem(tenantId, id, updates, db) {
+  return withTenant(tenantId, db, (trx) =>
+    trx('items').where({ id, tenant_id: tenantId }).update(updates)
+  );
+}
+
+module.exports = { listItems, addItem, checkItem, archiveChecked, listArchived, deleteArchived, updateItem };

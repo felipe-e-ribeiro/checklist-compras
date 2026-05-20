@@ -65,6 +65,22 @@ describe('migrations', () => {
     expect(result.rows.length).toBe(1);
   });
 
+  test('items has quantity column (varchar 25)', async () => {
+    const result = await db.raw(
+      `SELECT character_maximum_length FROM information_schema.columns
+       WHERE table_name='items' AND column_name='quantity'`
+    );
+    expect(result.rows[0].character_maximum_length).toBe(25);
+  });
+
+  test('items has is_critical boolean column', async () => {
+    const result = await db.raw(
+      `SELECT data_type FROM information_schema.columns
+       WHERE table_name='items' AND column_name='is_critical'`
+    );
+    expect(result.rows[0].data_type).toBe('boolean');
+  });
+
   test('refresh_tokens has token_hash unique column', async () => {
     const result = await db.raw(
       `SELECT constraint_type FROM information_schema.table_constraints tc

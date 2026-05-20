@@ -72,6 +72,23 @@ function makeItemsRouter(db, requireAuth, requireTenant, io) {
     return res.status(200).json({ ok: true });
   });
 
+  router.patch('/app/item/:id', requireAuth, requireTenant, async (req, res) => {
+    const { id } = req.params;
+    const { quantity, is_critical } = req.body;
+
+    const updates = {};
+    if (quantity !== undefined) updates.quantity = quantity.trim() || null;
+    if (is_critical !== undefined) updates.is_critical = !!is_critical;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'no updates provided' });
+    }
+
+    await itemService.updateItem(req.tenantId, id, updates, db);
+    io.to(req.tenantId).emit('item-updated', { id, ...updates });
+    return res.status(200).json({ ok: true });
+  });
+
   router.post('/app/check-archived', requireAuth, requireTenant, async (req, res) => {
     const items = await itemService.listArchived(req.tenantId, db);
     return res.status(200).json(items);
