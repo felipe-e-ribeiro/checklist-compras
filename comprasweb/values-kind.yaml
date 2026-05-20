@@ -21,6 +21,11 @@ comprasweb:
   port: 3000
   serviceName: comprasweb
 
+  # Auth local para testes de carga (desabilitar em produção)
+  localAuthEnabled: "true"
+  localAuthUser: "loadtest"
+  localAuthPassword: "loadtest123"
+
   # Preencha googleClientId e googleClientSecret com suas credenciais reais
   jwtSecret: "local-dev-jwt-secret-change-me-in-prod"
   googleClientId: "YOUR_GOOGLE_CLIENT_ID"

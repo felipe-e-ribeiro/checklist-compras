@@ -13,6 +13,7 @@ const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
 
 const { makeRequireAuth, makeRequireTenant } = require('./middleware/auth');
 const makeAuthRouter = require('./routes/auth');
+const makeAccessRouter = require('./routes/access');
 const makeWorkspaceRouter = require('./routes/workspace');
 const makeItemsRouter = require('./routes/items');
 const authService = require('./services/authService');
@@ -97,6 +98,7 @@ function createServer(db) {
   setupRedisAdapter(io);
 
   app.use(makeAuthRouter(db));
+  app.use(makeAccessRouter(db));
   app.use(makeWorkspaceRouter(db, requireAuth, requireTenant));
   app.use(makeItemsRouter(db, requireAuth, requireTenant, io));
 
@@ -118,6 +120,7 @@ function createTestApp(db) {
   const { app, requireAuth, requireTenant } = createApp(db);
   const io = { to: () => ({ emit: () => {} }) };
   app.use(makeAuthRouter(db));
+  app.use(makeAccessRouter(db));
   app.use(makeWorkspaceRouter(db, requireAuth, requireTenant));
   app.use(makeItemsRouter(db, requireAuth, requireTenant, io));
   return app;

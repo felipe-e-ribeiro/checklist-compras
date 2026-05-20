@@ -71,6 +71,12 @@ spec:
               value: {{ .Values.comprasweb.googleCallbackUrl | quote }}
             - name: APP_URL
               value: {{ .Values.comprasweb.appUrl | quote }}
+            - name: LOCAL_AUTH_ENABLED
+              value: {{ .Values.comprasweb.localAuthEnabled | default "false" | quote }}
+            - name: LOCAL_AUTH_USER
+              value: {{ .Values.comprasweb.localAuthUser | default "loadtest" | quote }}
+            - name: LOCAL_AUTH_PASSWORD
+              value: {{ .Values.comprasweb.localAuthPassword | default "loadtest123" | quote }}
           readinessProbe:
             httpGet:
               path: /healthz
