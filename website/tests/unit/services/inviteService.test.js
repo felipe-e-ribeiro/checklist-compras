@@ -76,6 +76,11 @@ describe('validateInvite', () => {
 });
 
 describe('acceptInvite', () => {
+  test('returns null for invalid token', async () => {
+    const result = await inviteService.acceptInvite('invalid-token', 'some-user', db);
+    expect(result).toBeNull();
+  });
+
   test('marks invite as used and inserts tenant_member', async () => {
     const { tenant, user } = await setup();
     const [newUser] = await db('users').insert({ google_id: 'gi2', email: 'new@t.com' }).returning('*');

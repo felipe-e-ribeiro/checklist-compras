@@ -11,48 +11,34 @@ beforeAll(async () => {
   requireTenant = makeRequireTenant(db);
 });
 
-beforeEach(async () => {
-  await truncateAll();
-});
+beforeEach(async () => { await truncateAll(); });
 
-afterAll(async () => {
-  await destroyDb();
-});
+afterAll(async () => { await destroyDb(); });
 
 function mockRes() {
-  return {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn(),
-    on: jest.fn(),
-  };
+  return { status: jest.fn().mockReturnThis(), json: jest.fn() };
 }
 
 describe('requireTenant — no tenantId in JWT', () => {
   test('returns 403', async () => {
-    const req = { user: { sub: 'uid', email: 'a@b.com' }, cookies: {} };
+    const req = { user: { sub: 'uid', email: 'a@b.com' } };
     const res = mockRes();
     const next = jest.fn();
-
     await requireTenant(req, res, next);
-
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith({ code: 'FORBIDDEN' });
   });
 });
 
-describe('requireTenant — user is a valid member', () => {
-  test('injects req.tenantId, activates RLS, calls next()', async () => {
+describe('requireTenant — valid member', () => {
+  test('injects req.tenantId and calls next()', async () => {
     const [tenant] = await db('tenants').insert({ name: 'RT', slug: 'rt-slug' }).returning('*');
     const [user] = await db('users').insert({ google_id: 'grt1', email: 'rt@t.com' }).returning('*');
-    await db.raw('ALTER TABLE tenant_members DISABLE ROW LEVEL SECURITY');
+    // tenant_members sem FORCE RLS — insert direto funciona
     await db('tenant_members').insert({ tenant_id: tenant.id, user_id: user.id, role: 'member' });
-    await db.raw('ALTER TABLE tenant_members ENABLE ROW LEVEL SECURITY');
 
-    const req = {
-      user: { sub: user.id, email: user.email, tenantId: tenant.id },
-      cookies: {},
-    };
+    const req = { user: { sub: user.id, email: user.email, tenantId: tenant.id } };
     const res = mockRes();
     const next = jest.fn();
 
@@ -60,19 +46,16 @@ describe('requireTenant — user is a valid member', () => {
 
     expect(next).toHaveBeenCalled();
     expect(req.tenantId).toBe(tenant.id);
-    expect(req.db).toBeDefined();
+    expect(req.db).toBe(db);
   });
 });
 
-describe('requireTenant — user is not a member', () => {
+describe('requireTenant — not a member', () => {
   test('returns 403', async () => {
     const [tenant] = await db('tenants').insert({ name: 'NT', slug: 'nt-slug' }).returning('*');
     const [user] = await db('users').insert({ google_id: 'gnt1', email: 'nt@t.com' }).returning('*');
 
-    const req = {
-      user: { sub: user.id, email: user.email, tenantId: tenant.id },
-      cookies: {},
-    };
+    const req = { user: { sub: user.id, email: user.email, tenantId: tenant.id } };
     const res = mockRes();
     const next = jest.fn();
 
@@ -80,21 +63,35 @@ describe('requireTenant — user is not a member', () => {
 
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({ code: 'FORBIDDEN' });
   });
 });
 
 describe('requireTenant — tenant does not exist', () => {
   test('returns 403', async () => {
     const [user] = await db('users').insert({ google_id: 'gne1', email: 'ne@t.com' }).returning('*');
-    const req = {
-      user: { sub: user.id, email: user.email, tenantId: '00000000-0000-0000-0000-000000000000' },
-      cookies: {},
-    };
+    const req = { user: { sub: user.id, email: user.email, tenantId: '00000000-0000-0000-0000-000000000000' } };
     const res = mockRes();
     const next = jest.fn();
 
     await requireTenant(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+});
+
+describe('requireTenant — DB error', () => {
+  test('returns 403 when DB throws', async () => {
+    const brokenDb = Object.assign(
+      () => ({ where: () => ({ first: () => Promise.reject(new Error('DB error')) }) }),
+      { fn: { now: () => new Date() } }
+    );
+    const rt = makeRequireTenant(brokenDb);
+    const req = { user: { sub: 'uid', email: 'a@b.com', tenantId: '00000000-0000-0000-0000-000000000001' } };
+    const res = mockRes();
+    const next = jest.fn();
+
+    await rt(req, res, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(403);

@@ -12,12 +12,28 @@ module.exports = async () => {
       password: process.env.DB_PASSWORD || 'test',
       database: process.env.DB_NAME || 'lista_compras_test',
     },
+    pool: { min: 0, max: 2 },
     migrations: { directory: require('path').join(__dirname, '../../migrations') },
   });
 
-  try { await db.migrate.forceFreeMigrationsLock(); } catch { /* already unlocked */ }
-  await db.migrate.rollback(undefined, true);
+  // Matar conexões presas de runs anteriores
+  await db.raw(`
+    SELECT pg_terminate_backend(pid)
+    FROM pg_stat_activity
+    WHERE datname = current_database()
+      AND state = 'idle in transaction'
+      AND pid != pg_backend_pid()
+  `);
+
+  try { await db.migrate.forceFreeMigrationsLock(); } catch { /* ok */ }
+
+  // Não faz rollback completo — apenas garante que o schema está na última versão
   await db.migrate.latest();
+
+  // Limpar dados de runs anteriores
+  await db.raw(
+    'TRUNCATE TABLE items, invites, refresh_tokens, tenant_members, users, tenants RESTART IDENTITY CASCADE'
+  );
 
   await db.destroy();
 };

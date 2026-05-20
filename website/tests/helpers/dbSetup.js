@@ -15,6 +15,7 @@ function getTestDb() {
         password: process.env.DB_PASSWORD || 'test',
         database: process.env.DB_NAME || 'lista_compras_test',
       },
+      pool: { min: 0, max: 5 },
       migrations: { directory: require('path').join(__dirname, '../../migrations') },
     });
   }
@@ -23,31 +24,32 @@ function getTestDb() {
 
 async function unlock() {
   const db = getTestDb();
-  try { await db.migrate.forceFreeMigrationsLock(); } catch { /* already unlocked */ }
+  try { await db.migrate.forceFreeMigrationsLock(); } catch { /* ok */ }
 }
 
 async function migrate() {
-  const db = getTestDb();
   await unlock();
-  await db.migrate.latest();
+  await getTestDb().migrate.latest();
 }
 
 async function rollback() {
-  const db = getTestDb();
   await unlock();
-  await db.migrate.rollback(undefined, true);
+  await getTestDb().migrate.rollback(undefined, true);
 }
 
 async function truncateAll() {
   const db = getTestDb();
-  // Disable RLS temporarily for truncation
-  await db.raw('ALTER TABLE items DISABLE ROW LEVEL SECURITY');
-  await db.raw('ALTER TABLE tenant_members DISABLE ROW LEVEL SECURITY');
+  // Matar conexões idle-in-transaction que bloqueiam DDL/TRUNCATE
+  await db.raw(`
+    SELECT pg_terminate_backend(pid)
+    FROM pg_stat_activity
+    WHERE datname = current_database()
+      AND state = 'idle in transaction'
+      AND pid != pg_backend_pid()
+  `);
   await db.raw(
     'TRUNCATE TABLE items, invites, refresh_tokens, tenant_members, users, tenants RESTART IDENTITY CASCADE'
   );
-  await db.raw('ALTER TABLE items ENABLE ROW LEVEL SECURITY');
-  await db.raw('ALTER TABLE tenant_members ENABLE ROW LEVEL SECURITY');
 }
 
 async function destroyDb() {

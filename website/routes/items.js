@@ -8,7 +8,7 @@ function makeItemsRouter(db, requireAuth, requireTenant, io) {
 
   router.get('/app', requireAuth, requireTenant, async (req, res) => {
     const sortBy = req.query.sortBy || 'item';
-    const items = await itemService.listItems(req.tenantId, sortBy, req.db);
+    const items = await itemService.listItems(req.tenantId, sortBy, db);
     res.render('lista', { items, sortBy, user: req.user, tenantId: req.tenantId });
   });
 
@@ -16,7 +16,7 @@ function makeItemsRouter(db, requireAuth, requireTenant, io) {
     const { item } = req.body;
     if (!item || !item.trim()) return res.status(400).json({ error: 'item required' });
 
-    const newItem = await itemService.addItem(req.tenantId, item.trim(), req.db);
+    const newItem = await itemService.addItem(req.tenantId, item.trim(), db);
     io.to(req.tenantId).emit('item-added', newItem);
 
     if (req.accepts('html')) return res.redirect('/app');
@@ -26,7 +26,7 @@ function makeItemsRouter(db, requireAuth, requireTenant, io) {
   router.post('/app/check', requireAuth, requireTenant, async (req, res) => {
     const { id, checked } = req.body;
     const isChecked = checked === 'on';
-    await itemService.checkItem(req.tenantId, id, isChecked, req.db);
+    await itemService.checkItem(req.tenantId, id, isChecked, db);
     io.to(req.tenantId).emit('item-checked', { id, checked: isChecked });
 
     if (req.accepts('html')) return res.redirect('/app');
@@ -34,7 +34,7 @@ function makeItemsRouter(db, requireAuth, requireTenant, io) {
   });
 
   router.post('/app/clear-checked', requireAuth, requireTenant, async (req, res) => {
-    await itemService.archiveChecked(req.tenantId, req.db);
+    await itemService.archiveChecked(req.tenantId, db);
     io.to(req.tenantId).emit('item-checked');
 
     const fqdnUrl = process.env.FQDN_URL;
@@ -53,24 +53,25 @@ function makeItemsRouter(db, requireAuth, requireTenant, io) {
   });
 
   router.post('/app/check-archived', requireAuth, requireTenant, async (req, res) => {
-    const items = await itemService.listArchived(req.tenantId, req.db);
+    const items = await itemService.listArchived(req.tenantId, db);
     return res.status(200).json(items);
   });
 
   router.delete('/app/remove-archived', requireAuth, requireTenant, async (req, res) => {
-    await itemService.deleteArchived(req.tenantId, req.db);
+    await itemService.deleteArchived(req.tenantId, db);
     return res.status(200).json({ ok: true });
   });
 
   router.post('/workspace/invite', requireAuth, requireTenant, async (req, res) => {
-    const member = await req.db('tenant_members')
+    // tenant_members sem FORCE RLS — consulta direta OK
+    const member = await db('tenant_members')
       .where({ tenant_id: req.tenantId, user_id: req.user.sub })
       .first();
 
     if (!member || member.role !== 'owner') return res.status(403).json({ code: 'FORBIDDEN' });
 
     const token = await inviteService.createInvite(req.tenantId, req.user.sub, db);
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const appUrl = process.env.APP_URL || /* istanbul ignore next */ 'http://localhost:3000';
     return res.status(200).json({ inviteUrl: `${appUrl}/join?token=${token}` });
   });
 

@@ -4,35 +4,29 @@ const itemService = require('../../../services/itemService');
 const { getTestDb, truncateAll, destroyDb } = require('../../helpers/dbSetup');
 
 let db;
-let tenantA, tenantB, userA;
+let tenantA, tenantB;
 
-beforeAll(async () => {
-  db = getTestDb();
-});
+beforeAll(async () => { db = getTestDb(); });
 
 beforeEach(async () => {
   await truncateAll();
   [tenantA] = await db('tenants').insert({ name: 'A', slug: 'item-a' }).returning('*');
   [tenantB] = await db('tenants').insert({ name: 'B', slug: 'item-b' }).returning('*');
-  [userA] = await db('users').insert({ google_id: 'gi-is1', email: 'is@t.com' }).returning('*');
 });
 
-afterAll(async () => {
-  await destroyDb();
-});
+afterAll(async () => { await destroyDb(); });
 
-async function withTenant(tenantId, fn) {
+// Helper: lê items diretamente dentro de uma transação com set_config
+async function readItems(tenantId, where = {}) {
   return db.transaction(async (trx) => {
     await trx.raw(`SELECT set_config('app.current_tenant_id', ?, true)`, [tenantId]);
-    return fn(trx);
+    return trx('items').where({ tenant_id: tenantId, ...where });
   });
 }
 
 describe('addItem', () => {
   test('adds item to correct tenant', async () => {
-    const item = await withTenant(tenantA.id, (trx) =>
-      itemService.addItem(tenantA.id, 'Arroz', trx)
-    );
+    const item = await itemService.addItem(tenantA.id, 'Arroz', db);
     expect(item.item).toBe('Arroz');
     expect(item.tenant_id).toBe(tenantA.id);
     expect(item.checked).toBe(false);
@@ -41,65 +35,51 @@ describe('addItem', () => {
 
 describe('listItems', () => {
   test('returns only non-archived items of tenant', async () => {
-    await withTenant(tenantA.id, async (trx) => {
-      await itemService.addItem(tenantA.id, 'Feijão', trx);
-      await itemService.addItem(tenantA.id, 'Archived', trx);
-    });
-    await withTenant(tenantB.id, async (trx) => {
-      await itemService.addItem(tenantB.id, 'Outro', trx);
-    });
+    await itemService.addItem(tenantA.id, 'Feijão', db);
+    const [toArchive] = await db('items').insert({ tenant_id: tenantA.id, item: 'Archived', archived: true }).returning('*');
+    await itemService.addItem(tenantB.id, 'Outro', db);
 
-    await db('items').where({ item: 'Archived' }).update({ archived: true });
-
-    const items = await withTenant(tenantA.id, (trx) =>
-      itemService.listItems(tenantA.id, 'item', trx)
-    );
+    const items = await itemService.listItems(tenantA.id, 'item', db);
     expect(items).toHaveLength(1);
     expect(items[0].item).toBe('Feijão');
   });
 
   test('sorts by checked when sortBy=checked', async () => {
-    await withTenant(tenantA.id, async (trx) => {
-      await itemService.addItem(tenantA.id, 'Z', trx);
-      await itemService.addItem(tenantA.id, 'A', trx);
+    await itemService.addItem(tenantA.id, 'Z', db);
+    await itemService.addItem(tenantA.id, 'A', db);
+    await db.transaction(async (trx) => {
+      await trx.raw(`SELECT set_config('app.current_tenant_id', ?, true)`, [tenantA.id]);
+      await trx('items').where({ tenant_id: tenantA.id, item: 'Z' }).update({ checked: true });
     });
-    await db('items').where({ item: 'Z' }).update({ checked: true });
 
-    const items = await withTenant(tenantA.id, (trx) =>
-      itemService.listItems(tenantA.id, 'checked', trx)
-    );
+    const items = await itemService.listItems(tenantA.id, 'checked', db);
     expect(items[0].item).toBe('A');
     expect(items[1].item).toBe('Z');
   });
 });
 
 describe('checkItem', () => {
-  test('updates checked status of item in tenant', async () => {
-    const item = await withTenant(tenantA.id, (trx) =>
-      itemService.addItem(tenantA.id, 'Leite', trx)
-    );
-    await withTenant(tenantA.id, (trx) =>
-      itemService.checkItem(tenantA.id, item.id, true, trx)
-    );
-    const updated = await db('items').where({ id: item.id }).first();
-    expect(updated.checked).toBe(true);
+  test('updates checked status', async () => {
+    const item = await itemService.addItem(tenantA.id, 'Leite', db);
+    await itemService.checkItem(tenantA.id, item.id, true, db);
+    const rows = await readItems(tenantA.id, { id: item.id });
+    expect(rows[0].checked).toBe(true);
   });
 });
 
 describe('archiveChecked', () => {
   test('archives only checked items of the tenant', async () => {
-    await withTenant(tenantA.id, async (trx) => {
-      await itemService.addItem(tenantA.id, 'Checked', trx);
-      await itemService.addItem(tenantA.id, 'Unchecked', trx);
+    await itemService.addItem(tenantA.id, 'Checked', db);
+    await itemService.addItem(tenantA.id, 'Unchecked', db);
+    await db.transaction(async (trx) => {
+      await trx.raw(`SELECT set_config('app.current_tenant_id', ?, true)`, [tenantA.id]);
+      await trx('items').where({ tenant_id: tenantA.id, item: 'Checked' }).update({ checked: true });
     });
-    await db('items').where({ item: 'Checked' }).update({ checked: true });
 
-    const count = await withTenant(tenantA.id, (trx) =>
-      itemService.archiveChecked(tenantA.id, trx)
-    );
+    const count = await itemService.archiveChecked(tenantA.id, db);
     expect(count).toBe(1);
 
-    const archived = await db('items').where({ archived: true });
+    const archived = await readItems(tenantA.id, { archived: true });
     expect(archived).toHaveLength(1);
     expect(archived[0].item).toBe('Checked');
   });
@@ -107,14 +87,13 @@ describe('archiveChecked', () => {
 
 describe('listArchived', () => {
   test('returns only archived items of tenant', async () => {
-    await withTenant(tenantA.id, async (trx) => {
-      await itemService.addItem(tenantA.id, 'ToArchive', trx);
+    await itemService.addItem(tenantA.id, 'ToArchive', db);
+    await db.transaction(async (trx) => {
+      await trx.raw(`SELECT set_config('app.current_tenant_id', ?, true)`, [tenantA.id]);
+      await trx('items').where({ tenant_id: tenantA.id }).update({ archived: true, archived_at: trx.fn.now() });
     });
-    await db('items').where({ item: 'ToArchive' }).update({ archived: true, archived_at: db.fn.now() });
 
-    const archived = await withTenant(tenantA.id, (trx) =>
-      itemService.listArchived(tenantA.id, trx)
-    );
+    const archived = await itemService.listArchived(tenantA.id, db);
     expect(archived).toHaveLength(1);
     expect(archived[0].item).toBe('ToArchive');
   });
@@ -122,16 +101,19 @@ describe('listArchived', () => {
 
 describe('deleteArchived', () => {
   test('deletes archived items of tenant only', async () => {
-    await withTenant(tenantA.id, async (trx) => {
-      await itemService.addItem(tenantA.id, 'Del', trx);
+    await itemService.addItem(tenantA.id, 'Del', db);
+    await itemService.addItem(tenantB.id, 'Keep', db);
+    await db.transaction(async (trx) => {
+      await trx.raw(`SELECT set_config('app.current_tenant_id', ?, true)`, [tenantA.id]);
+      await trx('items').where({ tenant_id: tenantA.id }).update({ archived: true });
     });
-    await db('items').where({ item: 'Del' }).update({ archived: true });
 
-    await withTenant(tenantA.id, (trx) =>
-      itemService.deleteArchived(tenantA.id, trx)
-    );
+    await itemService.deleteArchived(tenantA.id, db);
 
-    const remaining = await db('items').where({ tenant_id: tenantA.id });
+    const remaining = await readItems(tenantA.id);
     expect(remaining).toHaveLength(0);
+    // tenantB intocado
+    const rowsB = await db('items').where({ tenant_id: tenantB.id });
+    expect(rowsB).toHaveLength(1);
   });
 });

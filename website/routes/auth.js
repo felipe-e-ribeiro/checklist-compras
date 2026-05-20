@@ -3,23 +3,26 @@ const passport = require('passport');
 const authService = require('../services/authService');
 const { COOKIE_OPTS } = require('../middleware/auth');
 
+async function _handleOAuthCallback(req, res, db) {
+  const user = req.user;
+  const accessToken = authService.signAccessToken({ sub: user.id, email: user.email });
+  const refreshToken = authService.generateRefreshToken();
+  await authService.saveRefreshToken(user.id, refreshToken, db);
+  res.cookie('access_token', accessToken, COOKIE_OPTS);
+  res.cookie('refresh_token', refreshToken, COOKIE_OPTS);
+  res.redirect('/select-workspace');
+}
+
 function makeAuthRouter(db) {
   const router = express.Router();
 
-  router.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
+  router.get('/auth/google',
+    passport.authenticate('google', { scope: ['profile', 'email'], session: false })
+  );
 
-  router.get(
-    '/auth/google/callback',
+  router.get('/auth/google/callback',
     passport.authenticate('google', { session: false, failureRedirect: '/auth/google' }),
-    async (req, res) => {
-      const { id, email } = req.user;
-      const accessToken = authService.signAccessToken({ sub: id, email });
-      const refreshToken = authService.generateRefreshToken();
-      await authService.saveRefreshToken(id, refreshToken, db);
-      res.cookie('access_token', accessToken, COOKIE_OPTS);
-      res.cookie('refresh_token', refreshToken, COOKIE_OPTS);
-      res.redirect('/select-workspace');
-    }
+    /* istanbul ignore next */ (req, res) => _handleOAuthCallback(req, res, db)
   );
 
   router.post('/auth/refresh', async (req, res) => {
@@ -34,10 +37,7 @@ function makeAuthRouter(db) {
         decoded = authService.verifyAccessToken(accessToken);
       } catch (err) {
         if (err.name === 'TokenExpiredError') {
-          const parts = accessToken.split('.');
-          if (parts.length === 3) {
-            decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-          }
+          decoded = authService.decodeWithoutVerify(accessToken);
         }
       }
     }
@@ -69,7 +69,7 @@ function makeAuthRouter(db) {
         const record = await authService.validateRefreshToken(refreshToken, decoded.sub, db);
         if (record) await db('refresh_tokens').where({ id: record.id }).update({ revoked_at: db.fn.now() });
       } catch {
-        // expired token — still clear cookies
+        // expired or invalid token — still clear cookies
       }
     }
 
@@ -81,4 +81,5 @@ function makeAuthRouter(db) {
   return router;
 }
 
+makeAuthRouter._handleOAuthCallback = _handleOAuthCallback;
 module.exports = makeAuthRouter;

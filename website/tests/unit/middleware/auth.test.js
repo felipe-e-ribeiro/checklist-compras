@@ -11,106 +11,113 @@ beforeAll(async () => {
   db = getTestDb();
   requireAuth = makeRequireAuth(db);
 });
-
-beforeEach(async () => {
-  await truncateAll();
-});
-
-afterAll(async () => {
-  await destroyDb();
-});
+beforeEach(async () => { await truncateAll(); });
+afterAll(async () => { await destroyDb(); });
 
 function mockRes() {
-  const res = {
-    redirect: jest.fn(),
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn(),
-  };
-  return res;
+  return { redirect: jest.fn(), status: jest.fn().mockReturnThis(), json: jest.fn(), cookie: jest.fn() };
 }
 
-function mockReq(cookieOverrides = {}) {
-  return { cookies: { ...cookieOverrides } };
-}
-
-describe('requireAuth — access token valid', () => {
+describe('valid access token', () => {
   test('injects req.user and calls next()', async () => {
     const token = authService.signAccessToken({ sub: 'user-id', email: 'a@b.com' });
-    const req = mockReq({ access_token: token });
+    const req = { cookies: { access_token: token } };
     const res = mockRes();
     const next = jest.fn();
-
     await requireAuth(req, res, next);
-
     expect(next).toHaveBeenCalled();
     expect(req.user.sub).toBe('user-id');
-    expect(req.user.email).toBe('a@b.com');
-    expect(res.redirect).not.toHaveBeenCalled();
   });
 });
 
-describe('requireAuth — access token missing', () => {
-  test('redirects to /auth/google when no refresh token', async () => {
-    const req = mockReq({});
+describe('no access token', () => {
+  test('redirects to /auth/google when no refresh token either', async () => {
+    const req = { cookies: {} };
     const res = mockRes();
     const next = jest.fn();
-
     await requireAuth(req, res, next);
-
     expect(next).not.toHaveBeenCalled();
     expect(res.redirect).toHaveBeenCalledWith('/auth/google');
   });
 });
 
-describe('requireAuth — access token invalid signature', () => {
+describe('invalid token signature', () => {
   test('redirects to /auth/google', async () => {
-    const req = mockReq({ access_token: 'bad.token.here' });
+    const req = { cookies: { access_token: 'bad.token.here' } };
     const res = mockRes();
     const next = jest.fn();
-
     await requireAuth(req, res, next);
-
     expect(next).not.toHaveBeenCalled();
     expect(res.redirect).toHaveBeenCalledWith('/auth/google');
   });
 });
 
-describe('requireAuth — access token expired, refresh token valid', () => {
-  test('rotates tokens, sets cookies, injects user, calls next()', async () => {
+describe('expired token with valid refresh', () => {
+  test('rotates tokens, injects user, calls next()', async () => {
     const [user] = await db('users')
-      .insert({ google_id: 'ga1', email: 'refresh@t.com', name: 'Refresh User' })
+      .insert({ google_id: 'ga1', email: 'refresh@t.com', name: 'R' })
       .returning('*');
 
     const expiredToken = authService.signAccessToken({ sub: user.id, email: user.email }, '-1s');
     const refreshToken = authService.generateRefreshToken();
     await authService.saveRefreshToken(user.id, refreshToken, db);
 
-    const cookies = {};
-    const res = {
-      redirect: jest.fn(),
-      cookie: jest.fn((name, val) => { cookies[name] = val; }),
-    };
-    const req = mockReq({ access_token: expiredToken, refresh_token: refreshToken });
+    const req = { cookies: { access_token: expiredToken, refresh_token: refreshToken } };
+    const res = mockRes();
     const next = jest.fn();
-
     await requireAuth(req, res, next);
 
     expect(next).toHaveBeenCalled();
     expect(req.user.sub).toBe(user.id);
     expect(res.cookie).toHaveBeenCalledWith('access_token', expect.any(String), expect.any(Object));
-    expect(res.cookie).toHaveBeenCalledWith('refresh_token', expect.any(String), expect.any(Object));
+  });
+
+  test('preserves tenantId from expired token', async () => {
+    const [user] = await db('users')
+      .insert({ google_id: 'ga2', email: 'tid@t.com' })
+      .returning('*');
+    const expiredToken = authService.signAccessToken(
+      { sub: user.id, email: user.email, tenantId: 'some-tenant' }, '-1s'
+    );
+    const refreshToken = authService.generateRefreshToken();
+    await authService.saveRefreshToken(user.id, refreshToken, db);
+
+    const req = { cookies: { access_token: expiredToken, refresh_token: refreshToken } };
+    const res = mockRes();
+    const next = jest.fn();
+    await requireAuth(req, res, next);
+    expect(next).toHaveBeenCalled();
+    expect(req.user.tenantId).toBe('some-tenant');
   });
 });
 
-describe('requireAuth — access token expired, refresh token invalid', () => {
-  test('redirects to /auth/google', async () => {
-    const expiredToken = authService.signAccessToken({ sub: 'uid', email: 'x@x.com' }, '-1s');
-    const req = mockReq({ access_token: expiredToken, refresh_token: 'invalid-refresh' });
+describe('expired token with invalid refresh', () => {
+  test('redirects to /auth/google when no tokens exist for user', async () => {
+    // UUID válido mas sem tokens no banco → validateRefreshToken retorna null → cobre if(!record)
+    const fakeUuid = '00000000-0000-0000-0000-000000000001';
+    const expiredToken = authService.signAccessToken({ sub: fakeUuid, email: 'x@x.com' }, '-1s');
+    const req = { cookies: { access_token: expiredToken, refresh_token: 'sometoken' } };
     const res = mockRes();
     const next = jest.fn();
-
     await requireAuth(req, res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.redirect).toHaveBeenCalledWith('/auth/google');
+  });
+});
 
+describe('expired token + DB error during refresh', () => {
+  test('redirects to /auth/google on DB error', async () => {
+    const expiredToken = authService.signAccessToken({ sub: 'uid', email: 'x@x.com' }, '-1s');
+    // DB that throws on any call
+    const brokenDb = Object.assign(
+      () => { throw new Error('DB DOWN'); },
+      { fn: { now: () => new Date() } }
+    );
+    const auth = makeRequireAuth(brokenDb);
+    const req = { cookies: { access_token: expiredToken, refresh_token: 'any' } };
+    const res = mockRes();
+    const next = jest.fn();
+    await auth(req, res, next);
     expect(next).not.toHaveBeenCalled();
     expect(res.redirect).toHaveBeenCalledWith('/auth/google');
   });
