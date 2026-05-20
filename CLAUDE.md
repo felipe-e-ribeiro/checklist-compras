@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Multi-tenant shopping list web app (lista de compras) built with Node.js/Express. Features Google OAuth authentication, JWT-based sessions (access + refresh tokens), real-time sync via Socket.IO + Redis adapter, and PostgreSQL with Row Level Security (RLS) for tenant data isolation.
+Multi-tenant shopping list web app (lista de compras) built with Node.js/Express. Features Google OAuth authentication, JWT-based sessions (access + refresh tokens), real-time sync via Socket.IO + Redis adapter, PostgreSQL with Row Level Security (RLS) for tenant data isolation, and Node.js cluster mode (2 workers) for throughput.
 
 ## Commands
 
@@ -36,7 +36,7 @@ cd website && npx jest --testNamePattern="returns record for valid token" --no-c
 
 ## Environment Variables
 
-All must be set before starting. No fallbacks for required secrets (`JWT_SECRET`, `BCRYPT_ROUNDS`, `GOOGLE_*`).
+All must be set before starting. No fallbacks for required secrets.
 
 | Variable | Purpose |
 |---|---|
@@ -44,12 +44,15 @@ All must be set before starting. No fallbacks for required secrets (`JWT_SECRET`
 | `DB_PORT` | PostgreSQL port (default 5432) |
 | `REDIS_HOST` | Redis URL (default `redis://localhost:6379`) |
 | `JWT_SECRET` | Signs access tokens — required, no fallback |
-| `BCRYPT_ROUNDS` | bcrypt cost factor — use `1` in tests, `10` in production |
+| `BCRYPT_ROUNDS` | bcrypt cost factor — `1` in tests, `10` in production |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 credentials |
-| `GOOGLE_CALLBACK_URL` | OAuth callback — use `http://localhost:3000/auth/google/callback` for local dev |
-| `APP_URL` | Base URL for generating invite links |
+| `GOOGLE_CALLBACK_URL` | OAuth callback — `http://localhost:3000/auth/google/callback` for local dev |
+| `APP_URL` | Base URL for invite links |
+| `WEB_CONCURRENCY` | Node.js cluster workers (default `2`; set `1` to disable cluster mode) |
+| `LOCAL_AUTH_ENABLED` | `"true"` to enable `/access` endpoint for load testing |
+| `LOCAL_AUTH_USER`, `LOCAL_AUTH_PASSWORD` | Credentials for `/access` local auth |
 | `PORT` | HTTP port (default 3000) |
-| `FQDN_URL`, `FQDN_USER`, `FQDN_PASSWORD` | Optional webhook called on `/app/clear-checked` |
+| `FQDN_URL`, `FQDN_USER`, `FQDN_PASSWORD` | Optional webhook on `/app/clear-checked` |
 
 Test values are in `website/.env.test` and loaded automatically by the test runner.
 
@@ -57,156 +60,158 @@ Test values are in `website/.env.test` and loaded automatically by the test runn
 
 ```
 website/
-  server.js         — bootstrap: Express, Socket.IO, Redis adapter, Passport, route wiring
-  db.js             — Knex instance (reads NODE_ENV to pick knexfile config)
+  server.js         — bootstrap: Express, Socket.IO (transports:websocket), Redis adapter (awaited),
+                      Passport, cluster mode, route wiring
+  db.js             — Knex instance, pool max:50
   knexfile.js       — DB configs for development / test / production
   middleware/
-    auth.js         — makeRequireAuth(db), makeRequireTenant(db), COOKIE_OPTS
+    auth.js         — makeRequireAuth(db), makeRequireTenant(db), COOKIE_OPTS (SameSite=Lax)
   routes/
-    auth.js         — /auth/google, /auth/google/callback, /auth/refresh, /auth/logout
-    workspace.js    — /select-workspace, /create-workspace, /join (invite acceptance)
-    items.js        — /app/* routes + /workspace/invite
+    auth.js         — OAuth, /auth/refresh, /auth/logout, /privacy, /account/export, /account/delete
+    access.js       — /access local auth for load testing (only when LOCAL_AUTH_ENABLED=true)
+    workspace.js    — /select-workspace, /workspace/switch, /workspace/list (lazy),
+                      /create-workspace, /join, /workspace/members/:userId (revoke)
+    items.js        — /app/* routes + /workspace/invite + PATCH /app/item/:id
   services/
     authService.js  — JWT sign/verify, refresh token generation/hashing/rotation
-    inviteService.js — create/validate/accept invite tokens
+    inviteService.js — create/validate/accept invite tokens (TTL: 60 seconds)
     itemService.js  — all item CRUD, each function wraps queries in a mini-transaction
-  migrations/       — 7 Knex migrations (run in order, versioned by filename timestamp)
-  views/            — EJS templates (login, select-workspace, create-workspace, error, lista)
+    userService.js  — anonymizeUser (GDPR Art.17), exportUserData (GDPR Art.20)
+  migrations/       — 9 Knex migrations (run in order, versioned by filename timestamp)
+  views/            — EJS templates (login, select-workspace, create-workspace, error,
+                      lista, privacy, access)
   tests/
-    helpers/        — globalSetup.js, dbSetup.js (singleton test DB), factories.js
+    helpers/        — globalSetup.js, dbSetup.js (singleton test DB)
     unit/           — middleware and service tests (use real test DB)
     integration/    — migration schema tests + route tests via Supertest
-comprasweb/         — Helm chart for Kubernetes deployment
-docker-compose.dev.yml — local postgres (5432) + postgres_test (5433) + redis (6379)
-kind-config.yaml    — kind cluster config with port 80/443 mapped to host
+comprasweb/         — Helm chart
+  templates/
+    deployment.yaml   — securityContext, readOnlyRootFilesystem, tmpfs
+    networkpolicy.yaml — default-deny-all + explicit policies per component
+    postgresql.yaml   — postgres:16-bookworm, non-root (UID 999)
+    redis.yaml        — redis:7-bookworm, non-root (UID 999)
+    migration-job.yaml — Helm hook, same securityContext as app
+scripts/
+  kind-setup.sh     — full automated kind cluster setup (7 steps incl. metrics-server + PSS labels)
+docker-compose.dev.yml — postgres:5432, postgres_test:5433, redis:6379
+kind-config.yaml    — kind cluster with port 80/443 mapped to host
 ```
 
 ## Key Design Decisions
 
 ### Authentication flow
-- **Access token**: JWT (HS256, 15 min), stored in `HttpOnly; SameSite=Strict` cookie.
-- **Refresh token**: 32-byte random hex, bcrypt-hashed in `refresh_tokens` table, 30-day expiry. Rotation on every use (old token revoked, new token issued).
-- `requireAuth` auto-refreshes transparently on the server side when the access token is expired — no client-side JS needed. Falls back to redirecting `/auth/google` when both tokens are invalid.
+- **Access token**: JWT (HS256, 15 min), `HttpOnly; SameSite=Lax` cookie. `SameSite=Lax` (not Strict) is required to survive OAuth redirect chains — Strict breaks cookies during Google → callback → app navigation.
+- **Refresh token**: 32-byte random hex, bcrypt-hashed in `refresh_tokens` table, 30-day expiry. Rotation on every use.
+- `requireAuth` auto-refreshes server-side. Falls back to redirecting `/login` (not `/auth/google`).
+- **GDPR**: cookie consent checkbox on `/login` (localStorage), privacy page at `/privacy`, account deletion/anonymization via `POST /account/delete`.
 
 ### Multi-tenancy
-- Two levels: **tenant** (workspace) and **user** (member of one or more tenants).
-- `tenant_id` is embedded in the JWT payload after workspace selection at `/select-workspace`.
-- `requireTenant` reads `tenant_id` from the JWT, verifies membership in `tenant_members` (no RLS on this table — the app user owns it and bypasses RLS), then injects `req.tenantId`.
-- **`items` table has FORCE ROW LEVEL SECURITY** — every query must run inside a transaction with `SET set_config('app.current_tenant_id', tenantId, true)` or it returns no rows. `itemService` handles this internally via `withTenant(tenantId, db, fn)`.
-- **`tenant_members` has RLS enabled but NOT FORCE** — the app user (table owner) bypasses it, allowing free queries for workspace listing without set_config.
+- Business rules: max **3 owned** workspaces, max **9 total** (owned + joined). Invite TTL: **60 seconds** (single-use).
+- `tenant_id` embedded in JWT after workspace selection. `requireTenant` verifies membership from DB (not JWT).
+- **`items` table: FORCE RLS** — every query needs a transaction with `set_config('app.current_tenant_id', tenantId, true)`. `itemService.withTenant()` handles this.
+- **`tenant_members`: RLS without FORCE** — app user (owner) bypasses it. Free queries for workspace listing without set_config.
+- `allWorkspaces` is lazy-loaded via `GET /workspace/list` (called client-side only when dropdown opens) — not included in every `GET /app` to reduce connection pool pressure.
 
 ### itemService transaction pattern
-Every `itemService` function uses `withTenant(tenantId, db, fn)` which:
+Every `itemService` function uses `withTenant(tenantId, db, fn)`:
 1. Opens a Knex transaction
-2. Calls `set_config('app.current_tenant_id', tenantId, true)` — local to the transaction
-3. Executes the query inside the transaction
-4. Auto-commits on return, auto-rolls back on throw
+2. Calls `set_config('app.current_tenant_id', tenantId, true)` — local to transaction
+3. Executes query, auto-commits/rolls back
 
-Never pass a long-lived transaction to services — always pass the global `db` and let the service manage its own mini-transaction.
+Always pass the global `db` (not a transaction) to services — they manage their own mini-transactions.
 
-### Socket.IO isolation
-Each client joins a room keyed by `tenantId`. The Socket.IO middleware reads the `access_token` cookie from the handshake headers and verifies the JWT server-side. All item events (`item-added`, `item-checked`) are emitted via `io.to(tenantId).emit(...)`.
+### Socket.IO + cluster mode
+- `transports: ['websocket']` on both server and client. Polling is disabled because it round-robins across cluster workers, fragmenting sessions (each poll request might hit a different worker that doesn't know about the socket).
+- Redis adapter awaited **before** server starts listening — critical for cluster mode. If the adapter is set after a socket connects, that socket's room joins go to the in-memory adapter and cross-worker events never reach it.
+- `WEB_CONCURRENCY=2` by default. Never use `os.cpus().length` in containers — it returns host CPU count, not the container limit.
 
 ### server.js exports
-`server.js` exports `createApp` which is actually `createTestApp` — a version that stubs `io` with a no-op and skips Redis/HTTP setup. This is what tests import. The real server only starts when `require.main === module`.
+`createApp` exported for tests is `createTestApp` — stubs `io` and skips Redis/HTTP. Cluster mode only activates via `require.main === module`.
 
 ## Database Schema
 
-7 migrations applied in order:
-1. `tenants` — `id` (UUID), `name`, `slug` (unique), `created_at`
-2. `users` — `id` (UUID), `google_id` (unique), `email` (unique), `name`, `avatar_url`
-3. `tenant_members` — PK (`tenant_id`, `user_id`), `role` ('owner'|'member'), `joined_at`. RLS enabled, no FORCE.
-4. `invites` — `token` (unique), `tenant_id`, `created_by`, `expires_at`, `used_at`
-5. `refresh_tokens` — `token_hash` (unique), `user_id`, `expires_at`, `revoked_at`
-6. `items` — `id` (UUID), `tenant_id`, `item`, `checked`, `archived`, `archived_at`
-7. RLS policies — ENABLE + FORCE on `items` (`tenant_isolation` policy); ENABLE only on `tenant_members` (`tenant_member_isolation` policy)
+9 migrations applied in order:
+1. `tenants` — `id` (UUID), `name`, `slug`, `created_at`
+2. `users` — `id` (UUID), `google_id`, `email`, `name`, `avatar_url`
+3. `tenant_members` — PK (`tenant_id`, `user_id`), `role`, `joined_at`. RLS enabled, no FORCE.
+4. `invites` — `token`, `tenant_id`, `expires_at`, `used_at`
+5. `refresh_tokens` — `token_hash`, `user_id`, `expires_at`, `revoked_at`
+6. `items` — `id` (UUID), `tenant_id`, `item`, `checked`, `archived`, `archived_at`, `quantity` (varchar 25), `is_critical` (bool)
+7. RLS policies — FORCE on `items`; ENABLE only on `tenant_members`
+8. `users.anonymized_at` — GDPR anonymization timestamp
+9. (migration 20260520000001) — `quantity` + `is_critical` columns on items
 
 ## Testing
 
-- **Coverage threshold**: 100% statements, branches, functions, lines enforced by Jest.
-- `globalSetup.js` runs once before all suites: kills idle-in-transaction connections, unlocks migrations, runs `migrate:latest`, truncates all tables.
-- `dbSetup.js` provides a singleton test DB connection. `truncateAll()` kills stuck connections before truncating to avoid DDL lock conflicts.
-- Unit tests for services use the real test DB (not mocks) — they exercise the actual RLS behavior via mini-transactions.
-- Integration route tests use Supertest against the full Express app with a real DB.
-- The OAuth callback handler `_handleOAuthCallback` is exported from `routes/auth.js` for direct testing, bypassing Passport.
+- **Coverage**: 100% statements/branches/functions/lines enforced. Currently 136 tests across 10 suites.
+- `globalSetup.js`: kills idle-in-transaction connections, unlocks migrations, runs `migrate:latest`, truncates all tables.
+- `truncateAll()` kills stuck connections before TRUNCATE to avoid DDL lock conflicts with idle-in-transaction sessions.
+- Unit tests for services use real test DB with explicit `set_config` transactions to exercise RLS.
+- Integration route tests use Supertest. OAuth callback handler `_handleOAuthCallback` is exported for direct testing (bypasses Passport).
+
+## Port-forward automático
+
+**O `Stop` hook abre a porta 3000 automaticamente** após cada resposta do Claude (configurado em `.claude/settings.json`). Não é mais necessário abrir manualmente.
+
+Se precisar abrir manualmente:
+```bash
+kubectl port-forward -n comprasweb-local svc/comprasweb 3000:3000
+```
 
 ## Testes de carga (obrigatório antes de releases)
 
-Use a skill `qa-load-test` (`.claude/skills/qa-load-test/`) antes de cada release:
+Use a skill `qa-load-test` antes de cada release. **Use o ingress, não o port-forward** — port-forward falha silenciosamente com 50+ usuários simultâneos.
 
 ```bash
-# Pré-requisito: port-forward ativo
-kubectl port-forward -n comprasweb-local svc/comprasweb 3000:3000 &
+# Pré-requisito: verificar ingress
+curl -s -o /dev/null -w "%{http_code}" -H "Host: compras.localhost" http://localhost/healthz
 
-# Protocolo completo (4 fases)
-node .claude/skills/qa-load-test/scripts/load-test.js http://localhost:3000 5   30  # baseline
-node .claude/skills/qa-load-test/scripts/load-test.js http://localhost:3000 20  60  # ramp
-node .claude/skills/qa-load-test/scripts/load-test.js http://localhost:3000 50  60  # stress
-node .claude/skills/qa-load-test/scripts/load-test.js http://localhost:3000 100 60  # peak
+# Protocolo completo via ingress
+HOST_HEADER=compras.localhost node .claude/skills/qa-load-test/scripts/load-test.js http://localhost 5   30
+HOST_HEADER=compras.localhost node .claude/skills/qa-load-test/scripts/load-test.js http://localhost 20  60
+HOST_HEADER=compras.localhost node .claude/skills/qa-load-test/scripts/load-test.js http://localhost 50  60
+HOST_HEADER=compras.localhost node .claude/skills/qa-load-test/scripts/load-test.js http://localhost 100 60
 ```
 
-**Limites conhecidos (single pod):** ≤20 usuários P99 <1s ✓ | 50 usuários P99 ~4s ⚠ | 100 usuários P99 ~6s ⚠  
-**Elo mais fraco:** Knex pool (max:10) + `GET /app` abre 3 conexões simultâneas.  
-**Fix prioritário:** `pool: { max: 50 }` em `db.js` + separar query `allWorkspaces` do GET /app.  
-**Relatórios gerados em:** `reports/` (ignorado pelo git). Arquivos temporários em: `tmp/` (ignorado).
+O script limpa todos os itens de teste ao final (Phase 4). Relatórios em `reports/` (gitignored).
+
+**Limites com 1 pod, 2 workers, pool max:50:**  
+≤20 usuários: P99 <1s ✓ | 50 usuários: P99 ~637ms ✓ | 100 usuários: P99 ~1s ✓
 
 ## Docker & Kubernetes
 
 **Skills locais disponíveis** (`.claude/skills/`):
 - `devsecops` — checklist de segurança obrigatório antes de qualquer push/release
-- `kind-ops` — setup, redeploy, logs HTTP (morgan), metrics-server, diagnóstico
+- `kind-ops` — setup, redeploy, logs HTTP, metrics-server, diagnóstico
 - `qa-load-test` — testes de carga, relatórios, análise de gargalos
 - `workspace-ux` — regras de negócio e guardrails do sistema de workspaces
 
 **Requisitos de segurança (não-negociáveis):**
 1. Nenhum secret no repositório — apenas placeholders `"CHANGE_IN_PROD"`
-2. Versões pinadas — sem `latest` em produção
+2. Versões pinadas — sem `latest` em produção (`node:22-bookworm-slim`, `postgres:16-bookworm`, `redis:7-bookworm`)
 3. Imagens multi-arch — suporte ARM64 + AMD64
-4. NetworkPolicies — least privilege, default deny-all
-5. Non-root — app: UID 1000, postgres/redis: UID 999
+4. NetworkPolicies — default deny-all + políticas explícitas por componente
+5. Non-root — app UID 1000, postgres/redis UID 999
 6. Pod Security Standards — `enforce: baseline`, `warn: restricted`
-7. Filesystem read-only — app container com `readOnlyRootFilesystem: true`
+7. Filesystem read-only — `readOnlyRootFilesystem: true` no app e migration job
 
-**Setup completo automatizado (inclui metrics-server):**
+**Setup completo automatizado:**
 ```bash
 bash scripts/kind-setup.sh
 ```
 
-**Build image** (uses `node:lts` Debian — Alpine causes musl/glibc bcrypt incompatibility):
+**Rebuild e redeploy (kind):**
 ```bash
-docker build -t feliperibeiro95/checklist-compras:latest .
-```
-The `.dockerignore` excludes `website/node_modules` — native modules must be compiled inside the container.
-
-**Local kind cluster** (requires kind, kubectl, helm):
-```bash
-# Create cluster (port 80/443 mapped to host)
-kind create cluster --config kind-config.yaml
-
-# Install nginx ingress controller
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s
-
-# Load images (postgres:16 and redis:7 must be pre-pulled)
 docker build -t comprasweb-local:latest .
 kind load docker-image comprasweb-local:latest --name compras
-kind load docker-image postgres:16 --name compras
-kind load docker-image redis:7 --name compras
-
-# Deploy (migrations run automatically as a Helm hook post-install/upgrade)
-kubectl create namespace comprasweb-local
-helm upgrade --install comprasweb ./comprasweb -f comprasweb/values-kind.yaml -n comprasweb-local \
-  --set comprasweb.googleClientId=YOUR_ID \
-  --set comprasweb.googleClientSecret=YOUR_SECRET \
+helm upgrade comprasweb ./comprasweb -f comprasweb/values-kind.yaml -n comprasweb-local --timeout 8m \
+  --set comprasweb.googleClientId=... --set comprasweb.googleClientSecret=... \
   --set comprasweb.googleCallbackUrl=http://localhost:3000/auth/google/callback \
-  --set comprasweb.appUrl=http://localhost:3000
-
-# Port-forward for Google OAuth compatibility (Google requires localhost for HTTP)
-kubectl port-forward -n comprasweb-local svc/comprasweb 3000:3000
+  --set comprasweb.appUrl=http://localhost:3000 \
+  --set comprasweb.jwtSecret=... --set postgresql.auth.password=...
+kubectl rollout status deployment/comprasweb-local -n comprasweb-local --timeout=60s
 ```
 
-Google OAuth requires `http://localhost:3000/auth/google/callback` to be registered in Google Cloud Console → APIs & Services → Credentials → Authorized redirect URIs.
+Google OAuth requer `http://localhost:3000/auth/google/callback` em APIs & Services → Credentials → Authorized redirect URIs.
 
-**Helm chart** (`comprasweb/`): includes templates for Deployment, Service, Ingress, Secret, HPA (disabled by default), ServiceAccount, RBAC, PostgreSQL StatefulSet, Redis Deployment, and migration Job (Helm hook). Credentials are passed via `--set` at deploy time, not stored in `values-kind.yaml`.
-
-**CI/CD**: `.github/workflows/ci.yaml` triggers on PR/push to main and on release publication. Jobs: `test` (Postgres 16 + Redis 7 as services, 100% coverage enforced) → `trivy` (blocks on CRITICAL CVEs) → `build-and-push` (multi-arch `linux/amd64`+`linux/arm64`, only on release).
+**CI/CD** (`.github/workflows/ci.yaml`): PR/push → `test` (136 testes, 100% coverage, Postgres+Redis como services) → `trivy` (bloqueia CVEs CRITICAL) → `build-and-push` (multi-arch, só em release).

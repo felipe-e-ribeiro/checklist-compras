@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pkill -f 'kubectl.*port-forward.*3000' 2>/dev/null; sleep 1; kubectl port-forward -n comprasweb-local svc/comprasweb 3000:3000 >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 15,
+            "statusMessage": "Abrindo porta 3000 no kind..."
+          }
+        ]
+      }
+    ]
+  }
+}
