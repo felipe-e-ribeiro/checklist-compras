@@ -4,7 +4,7 @@ const authService = require('../services/authService');
 const COOKIE_OPTS = {
   httpOnly: true,
   secure: /* istanbul ignore next */ process.env.NODE_ENV === 'production',
-  sameSite: 'strict',
+  sameSite: 'lax', // 'strict' bloqueia cookies em redirect chains do OAuth (Google → callback → app)
 };
 
 function makeRequireAuth(db) {

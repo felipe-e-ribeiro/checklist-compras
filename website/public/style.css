@@ -181,6 +181,9 @@ h2.display {
   background: transparent;
   color: var(--text-muted);
   border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .btn-icon:hover { background: var(--surface-alt); color: var(--text); }
 

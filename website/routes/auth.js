@@ -23,7 +23,7 @@ function makeAuthRouter(db) {
   );
 
   router.get('/auth/google/callback',
-    passport.authenticate('google', { session: false, failureRedirect: '/auth/google' }),
+    passport.authenticate('google', { session: false, failureRedirect: '/login' }),
     /* istanbul ignore next */ (req, res) => _handleOAuthCallback(req, res, db)
   );
 
@@ -77,7 +77,7 @@ function makeAuthRouter(db) {
 
     res.clearCookie('access_token', COOKIE_OPTS);
     res.clearCookie('refresh_token', COOKIE_OPTS);
-    res.status(200).json({ ok: true });
+    res.redirect('/login');
   });
 
   return router;

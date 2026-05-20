@@ -64,7 +64,7 @@ describe('_handleOAuthCallback', () => {
 // ── POST /auth/logout ────────────────────────────────────────────────────────
 
 describe('POST /auth/logout', () => {
-  test('revokes refresh token and clears cookies', async () => {
+  test('revokes refresh token, clears cookies, redirects to /login', async () => {
     const [user] = await db('users').insert({ google_id: 'al1', email: 'logout@t.com' }).returning('*');
     const refreshToken = authService.generateRefreshToken();
     await authService.saveRefreshToken(user.id, refreshToken, db);
@@ -73,7 +73,8 @@ describe('POST /auth/logout', () => {
     const res = await request(app).post('/auth/logout')
       .set('Cookie', [`access_token=${accessToken}`, `refresh_token=${refreshToken}`]);
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/login');
     const cookies = parseCookies(res);
     expect(cookies.access_token).toBe('');
     expect(cookies.refresh_token).toBe('');
@@ -82,12 +83,13 @@ describe('POST /auth/logout', () => {
     expect(revoked).toBeDefined();
   });
 
-  test('returns 200 with no cookies', async () => {
+  test('redirects to /login even with no cookies', async () => {
     const res = await request(app).post('/auth/logout');
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/login');
   });
 
-  test('returns 200 with expired access token (covers catch branch)', async () => {
+  test('redirects to /login with expired access token (covers catch branch)', async () => {
     const [user] = await db('users').insert({ google_id: 'al2', email: 'logexp@t.com' }).returning('*');
     const refreshToken = authService.generateRefreshToken();
     await authService.saveRefreshToken(user.id, refreshToken, db);
@@ -95,16 +97,18 @@ describe('POST /auth/logout', () => {
 
     const res = await request(app).post('/auth/logout')
       .set('Cookie', [`access_token=${expiredToken}`, `refresh_token=${refreshToken}`]);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/login');
   });
 
-  test('returns 200 when refresh record not found', async () => {
+  test('redirects to /login when refresh record not found', async () => {
     const [user] = await db('users').insert({ google_id: 'al3', email: 'lognoref@t.com' }).returning('*');
     const accessToken = authService.signAccessToken({ sub: user.id, email: user.email });
 
     const res = await request(app).post('/auth/logout')
       .set('Cookie', [`access_token=${accessToken}`, `refresh_token=nonexistent`]);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/login');
   });
 });
 
