@@ -153,9 +153,19 @@ node .claude/skills/qa-load-test/scripts/load-test.js http://localhost:3000 100 
 ## Docker & Kubernetes
 
 **Skills locais disponíveis** (`.claude/skills/`):
+- `devsecops` — checklist de segurança obrigatório antes de qualquer push/release
 - `kind-ops` — setup, redeploy, logs HTTP (morgan), metrics-server, diagnóstico
 - `qa-load-test` — testes de carga, relatórios, análise de gargalos
 - `workspace-ux` — regras de negócio e guardrails do sistema de workspaces
+
+**Requisitos de segurança (não-negociáveis):**
+1. Nenhum secret no repositório — apenas placeholders `"CHANGE_IN_PROD"`
+2. Versões pinadas — sem `latest` em produção
+3. Imagens multi-arch — suporte ARM64 + AMD64
+4. NetworkPolicies — least privilege, default deny-all
+5. Non-root — app: UID 1000, postgres/redis: UID 999
+6. Pod Security Standards — `enforce: baseline`, `warn: restricted`
+7. Filesystem read-only — app container com `readOnlyRootFilesystem: true`
 
 **Setup completo automatizado (inclui metrics-server):**
 ```bash

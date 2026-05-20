@@ -39,14 +39,26 @@ kubectl rollout status deployment/metrics-server -n kube-system --timeout=90s
 echo "[4/7] Buildando e carregando imagens..."
 docker build -t "$IMAGE_NAME" .
 kind load docker-image "$IMAGE_NAME" --name "$CLUSTER_NAME"
-kind load docker-image postgres:16 --name "$CLUSTER_NAME" 2>/dev/null || \
-  (docker pull postgres:16 && kind load docker-image postgres:16 --name "$CLUSTER_NAME")
-kind load docker-image redis:7 --name "$CLUSTER_NAME" 2>/dev/null || \
-  (docker pull redis:7 && kind load docker-image redis:7 --name "$CLUSTER_NAME")
+# Versões pinadas e multi-arch (ARM64 + AMD64)
+kind load docker-image postgres:16-bookworm --name "$CLUSTER_NAME" 2>/dev/null || \
+  (docker pull postgres:16-bookworm && kind load docker-image postgres:16-bookworm --name "$CLUSTER_NAME")
+kind load docker-image redis:7-bookworm --name "$CLUSTER_NAME" 2>/dev/null || \
+  (docker pull redis:7-bookworm && kind load docker-image redis:7-bookworm --name "$CLUSTER_NAME")
+kind load docker-image busybox:1.36 --name "$CLUSTER_NAME" 2>/dev/null || \
+  (docker pull busybox:1.36 && kind load docker-image busybox:1.36 --name "$CLUSTER_NAME")
 
 # ── 5. Namespace ──────────────────────────────────────────────────────
-echo "[5/7] Criando namespace '$NAMESPACE'..."
+echo "[5/7] Criando namespace '$NAMESPACE' com Pod Security Standards..."
 kubectl create namespace "$NAMESPACE" 2>/dev/null || echo "  Namespace já existe."
+# PSS: enforce baseline, warn+audit restricted
+kubectl label namespace "$NAMESPACE" \
+  pod-security.kubernetes.io/enforce=baseline \
+  pod-security.kubernetes.io/enforce-version=latest \
+  pod-security.kubernetes.io/warn=restricted \
+  pod-security.kubernetes.io/warn-version=latest \
+  pod-security.kubernetes.io/audit=restricted \
+  pod-security.kubernetes.io/audit-version=latest \
+  --overwrite 2>/dev/null || true
 
 # ── 6. Helm ───────────────────────────────────────────────────────────
 echo "[6/7] Fazendo deploy com Helm..."

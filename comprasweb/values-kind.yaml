@@ -6,7 +6,7 @@ postgresql:
   storage: 1Gi
   auth:
     username: compras
-    password: compras123
+    password: "CHANGE_IN_PROD"   # dev only — em prod: --set postgresql.auth.password=$SECRET
     database: lista_compras
 
 redis:
@@ -29,8 +29,9 @@ comprasweb:
   localAuthUser: "loadtest"
   localAuthPassword: "loadtest123"
 
-  # Preencha googleClientId e googleClientSecret com suas credenciais reais
-  jwtSecret: "local-dev-jwt-secret-change-me-in-prod"
+  # SECRETS — passar via --set ou gerenciar externamente em produção.
+  # Nunca commitar valores reais. Usar: helm upgrade ... --set comprasweb.jwtSecret=$SECRET
+  jwtSecret: "CHANGE_IN_PROD"
   googleClientId: "YOUR_GOOGLE_CLIENT_ID"
   googleClientSecret: "YOUR_GOOGLE_CLIENT_SECRET"
   googleCallbackUrl: "http://compras.localhost/auth/google/callback"
