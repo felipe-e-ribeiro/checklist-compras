@@ -8,8 +8,9 @@
     "dev": "nodemon server.js",
     "migrate": "knex migrate:latest",
     "rollback": "knex migrate:rollback",
-    "test": "jest --runInBand",
-    "test:coverage": "jest --runInBand --coverage"
+    "test": "jest --runInBand --forceExit",
+    "test:coverage": "jest --runInBand --coverage --forceExit",
+    "test:local": "docker compose -f ../docker-compose.dev.yml up -d postgres_test && jest --runInBand --coverage --forceExit"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.2.0",

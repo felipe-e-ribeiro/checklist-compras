@@ -1,2 +1,5 @@
 node_module*
 *-lock.json
+coverage/
+.env
+
