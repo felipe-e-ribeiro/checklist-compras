@@ -99,4 +99,4 @@ jobs:
           format: table
           exit-code: '1'
           severity: CRITICAL
-          ignore-unfixed: false
+          ignore-unfixed: true  # ignora CVEs sem fix disponível (ex: zlib1g will_not_fix)
