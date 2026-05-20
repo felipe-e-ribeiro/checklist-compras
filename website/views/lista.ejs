@@ -10,9 +10,7 @@
   <script src="/socket.io/socket.io.js"></script>
 
   <%
-    const currentWorkspace = allWorkspaces.find(w => w.id === tenantId) || { name: 'Lista' };
     const isOwner = userRole === 'owner';
-    const canCreate = ownedCount < 3;
   %>
 
   <!-- ── Navbar ──────────────────────────────────────────────────────── -->
@@ -27,38 +25,20 @@
             <path d="M16 10a4 4 0 01-8 0"/>
           </svg>
         </div>
-        <span class="ws-name"><%= currentWorkspace.name %></span>
+        <span class="ws-name" id="ws-current-name"><%= currentWorkspace ? currentWorkspace.name : 'Lista' %></span>
         <svg class="ws-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </button>
 
       <div class="ws-menu" id="ws-menu" role="menu">
-        <!-- Workspaces do usuário -->
-        <% allWorkspaces.forEach(function(ws) { %>
-          <% if (ws.id === tenantId) { %>
-            <div class="ws-item active" role="menuitem">
-              <svg class="ws-item-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              <span><%= ws.name %></span>
-              <span class="ws-item-role"><%= ws.role === 'owner' ? 'Dono' : 'Membro' %></span>
-            </div>
-          <% } else { %>
-            <form method="POST" action="/workspace/switch" style="margin:0">
-              <input type="hidden" name="tenantId" value="<%= ws.id %>">
-              <button type="submit" class="ws-item" role="menuitem">
-                <span style="width:14px;flex-shrink:0"></span>
-                <span><%= ws.name %></span>
-                <span class="ws-item-role"><%= ws.role === 'owner' ? 'Dono' : 'Membro' %></span>
-              </button>
-            </form>
-          <% } %>
-        <% }); %>
+        <!-- Lista carregada lazy via /workspace/list ao abrir o dropdown -->
+        <div id="ws-list-items">
+          <div class="ws-loading">Carregando...</div>
+        </div>
 
         <div class="ws-sep"></div>
 
-        <!-- Gerenciar (só para owners) -->
         <% if (isOwner) { %>
           <button class="ws-action" id="manage-btn" role="menuitem">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -68,16 +48,11 @@
           </button>
         <% } %>
 
-        <!-- Criar novo -->
-        <a href="/create-workspace" class="ws-action <%= canCreate ? '' : 'disabled' %>" role="menuitem">
+        <a href="/create-workspace" class="ws-action" id="ws-create-btn" role="menuitem">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          <% if (canCreate) { %>
-            Criar novo (<%= ownedCount %>/3)
-          <% } else { %>
-            Limite atingido (3/3)
-          <% } %>
+          <span id="ws-create-label">Criar novo</span>
         </a>
       </div>
     </div>
@@ -371,13 +346,57 @@
     }
     document.querySelectorAll('.item-qty').forEach(initQtyInput);
 
-    // ── Workspace dropdown ────────────────────────────────────────────
-    const wsTrigger = document.getElementById('ws-trigger');
-    const wsMenu = document.getElementById('ws-menu');
+    // ── Workspace dropdown (lazy load) ────────────────────────────────
+    const wsTrigger  = document.getElementById('ws-trigger');
+    const wsMenu     = document.getElementById('ws-menu');
+    const wsListEl   = document.getElementById('ws-list-items');
+    const wsCreateBtn = document.getElementById('ws-create-btn');
+    const wsCreateLabel = document.getElementById('ws-create-label');
+    let wsLoaded = false;
+
+    async function loadWorkspaces() {
+      if (wsLoaded) return;
+      try {
+        const res = await fetch('/workspace/list', { headers: { Accept: 'application/json' } });
+        const { workspaces, ownedCount } = await res.json();
+        wsLoaded = true;
+
+        // Atualizar contador no botão "Criar novo"
+        const canCreate = ownedCount < 3;
+        wsCreateLabel.textContent = canCreate
+          ? `Criar novo (${ownedCount}/3)`
+          : 'Limite atingido (3/3)';
+        if (!canCreate) wsCreateBtn.classList.add('disabled');
+
+        // Renderizar lista
+        wsListEl.innerHTML = workspaces.map(ws => {
+          const roleLabel = ws.role === 'owner' ? 'Dono' : 'Membro';
+          if (ws.id === '<%= tenantId %>') {
+            return `<div class="ws-item active" role="menuitem">
+              <svg class="ws-item-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>${ws.name}</span>
+              <span class="ws-item-role">${roleLabel}</span>
+            </div>`;
+          }
+          return `<form method="POST" action="/workspace/switch" style="margin:0">
+            <input type="hidden" name="tenantId" value="${ws.id}">
+            <button type="submit" class="ws-item" role="menuitem">
+              <span style="width:14px;flex-shrink:0"></span>
+              <span>${ws.name}</span>
+              <span class="ws-item-role">${roleLabel}</span>
+            </button>
+          </form>`;
+        }).join('');
+      } catch {
+        wsListEl.innerHTML = '<div class="ws-loading">Erro ao carregar.</div>';
+      }
+    }
+
     wsTrigger.addEventListener('click', (e) => {
       e.stopPropagation();
       const open = wsMenu.classList.toggle('open');
       wsTrigger.setAttribute('aria-expanded', open);
+      if (open) loadWorkspaces();
     });
     document.addEventListener('click', () => {
       wsMenu.classList.remove('open');

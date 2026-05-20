@@ -670,6 +670,7 @@ h2.display {
 }
 
 .ws-sep { height: 1px; background: var(--border-light); margin: 4px 0; }
+.ws-loading { padding: 10px 14px; font-size: 13px; color: var(--text-muted); font-style: italic; }
 
 .ws-action {
   display: flex;

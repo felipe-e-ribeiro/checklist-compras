@@ -8,26 +8,24 @@ function makeItemsRouter(db, requireAuth, requireTenant, io) {
 
   router.get('/app', requireAuth, requireTenant, async (req, res) => {
     const sortBy = req.query.sortBy || 'item';
-    const [items, members, allWorkspaces] = await Promise.all([
+
+    // allWorkspaces removido daqui — carregado lazy via GET /workspace/list
+    // quando o dropdown abre, reduzindo conexões por request de 3 → 2
+    const [items, members, currentWorkspace] = await Promise.all([
       itemService.listItems(req.tenantId, sortBy, db),
       db('tenant_members')
         .join('users', 'users.id', 'tenant_members.user_id')
         .where('tenant_members.tenant_id', req.tenantId)
         .select('users.id', 'users.name', 'users.email', 'tenant_members.role')
         .orderBy('tenant_members.joined_at', 'asc'),
-      db('tenant_members')
-        .join('tenants', 'tenants.id', 'tenant_members.tenant_id')
-        .where('tenant_members.user_id', req.user.sub)
-        .select('tenants.id', 'tenants.name', 'tenant_members.role')
-        .orderBy('tenants.name', 'asc'),
+      db('tenants').where({ id: req.tenantId }).first(), // lookup por PK — O(1)
     ]);
 
     const userRole = members.find((m) => m.id === req.user.sub)?.role;
-    const ownedCount = allWorkspaces.filter((w) => w.role === 'owner').length;
 
     res.render('lista', {
       items, sortBy, user: req.user, tenantId: req.tenantId,
-      members, allWorkspaces, userRole, ownedCount,
+      members, currentWorkspace, userRole,
     });
   });
 

@@ -36,6 +36,40 @@ async function createTenantWithMember(userId, role = 'owner', suffix = '') {
   return tenant;
 }
 
+// ── GET /workspace/list ──────────────────────────────────────────────────────
+
+describe('GET /workspace/list — unauthenticated', () => {
+  test('redirects to /login', async () => {
+    const res = await request(app).get('/workspace/list');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/login');
+  });
+});
+
+describe('GET /workspace/list — authenticated', () => {
+  test('returns workspaces and ownedCount', async () => {
+    const [user] = await db('users').insert({ google_id: 'gwl1', email: 'wl@t.com' }).returning('*');
+    const t1 = await createTenantWithMember(user.id, 'owner');
+    const t2 = await createTenantWithMember(user.id, 'member');
+
+    const res = await request(app).get('/workspace/list')
+      .set('Cookie', [authCookie({ sub: user.id, email: user.email })]);
+
+    expect(res.status).toBe(200);
+    expect(res.body.workspaces).toHaveLength(2);
+    expect(res.body.ownedCount).toBe(1);
+  });
+
+  test('returns empty list for user with no workspaces', async () => {
+    const [user] = await db('users').insert({ google_id: 'gwl2', email: 'wl2@t.com' }).returning('*');
+    const res = await request(app).get('/workspace/list')
+      .set('Cookie', [authCookie({ sub: user.id, email: user.email })]);
+    expect(res.status).toBe(200);
+    expect(res.body.workspaces).toHaveLength(0);
+    expect(res.body.ownedCount).toBe(0);
+  });
+});
+
 // ── GET /select-workspace ─────────────────────────────────────────────────────
 
 describe('GET /select-workspace — unauthenticated', () => {

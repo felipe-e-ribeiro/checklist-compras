@@ -68,6 +68,18 @@ function makeWorkspaceRouter(db, requireAuth, requireTenant) {
     return res.redirect('/app');
   });
 
+  // ── Lista workspaces do usuário (lazy — chamado só ao abrir dropdown) ─
+  router.get('/workspace/list', requireAuth, async (req, res) => {
+    const workspaces = await db('tenant_members')
+      .join('tenants', 'tenants.id', 'tenant_members.tenant_id')
+      .where('tenant_members.user_id', req.user.sub)
+      .select('tenants.id', 'tenants.name', 'tenant_members.role')
+      .orderBy('tenants.name', 'asc');
+
+    const ownedCount = workspaces.filter((w) => w.role === 'owner').length;
+    return res.json({ workspaces, ownedCount });
+  });
+
   // ── Troca de workspace in-app (dropdown) ──────────────────────────
   router.post('/workspace/switch', requireAuth, async (req, res) => {
     const { tenantId } = req.body;
