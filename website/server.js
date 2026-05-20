@@ -133,10 +133,27 @@ function createTestApp(db) {
 }
 
 if (require.main === module) {
-  const db = require('./db');
-  const PORT = process.env.PORT || 3000;
-  const server = createServer(db);
-  server.listen(PORT, () => console.log(`Server running on http://0.0.0.0:${PORT}`));
+  const cluster = require('cluster');
+
+  // WEB_CONCURRENCY controla o número de workers.
+  // Não usar os.cpus().length em containers — retorna CPUs do host, não do limit.
+  const WORKERS = parseInt(process.env.WEB_CONCURRENCY) || 2;
+
+  if (cluster.isPrimary && WORKERS > 1) {
+    console.log(`Primary ${process.pid} iniciando ${WORKERS} workers...`);
+    for (let i = 0; i < WORKERS; i++) cluster.fork();
+    cluster.on('exit', (worker, code, signal) => {
+      console.log(`Worker ${worker.process.pid} encerrou (${signal || code}) — reiniciando...`);
+      cluster.fork();
+    });
+  } else {
+    const db = require('./db');
+    const PORT = process.env.PORT || 3000;
+    const server = createServer(db);
+    server.listen(PORT, () =>
+      console.log(`Worker ${process.pid} em http://0.0.0.0:${PORT}`)
+    );
+  }
 }
 
 module.exports = { createApp: createTestApp };

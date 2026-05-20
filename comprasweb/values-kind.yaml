@@ -21,6 +21,9 @@ comprasweb:
   port: 3000
   serviceName: comprasweb
 
+  # Workers Node.js (cluster mode) — não usar os.cpus() em containers
+  webConcurrency: "2"   # kind tem CPU limitado; prod: ajustar conforme limits.cpu
+
   # Auth local para testes de carga (desabilitar em produção)
   localAuthEnabled: "true"
   localAuthUser: "loadtest"

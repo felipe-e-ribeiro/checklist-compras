@@ -71,6 +71,8 @@ spec:
               value: {{ .Values.comprasweb.googleCallbackUrl | quote }}
             - name: APP_URL
               value: {{ .Values.comprasweb.appUrl | quote }}
+            - name: WEB_CONCURRENCY
+              value: {{ .Values.comprasweb.webConcurrency | default "2" | quote }}
             - name: LOCAL_AUTH_ENABLED
               value: {{ .Values.comprasweb.localAuthEnabled | default "false" | quote }}
             - name: LOCAL_AUTH_USER
