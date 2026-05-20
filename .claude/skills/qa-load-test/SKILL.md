@@ -53,21 +53,34 @@ O script já inclui cleanup automático no final (Phase 4): marca todos os itens
 criados como checked → arquiva → deleta arquivados. A lista fica limpa para
 o próximo teste.
 
-## Execução rápida
+## ⚠️ Usar INGRESS, não port-forward
+
+O `kubectl port-forward` abre 1 conexão TCP por request. Com 50+ usuários
+simultâneos (150+ conexões), o kubectl rejeita tudo silenciosamente — CPU idle,
+zero requests chegam ao servidor. **Sempre usar o ingress (porta 80) para load test.**
 
 ```bash
-# Teste baseline (10 usuários, 30s)
-node .claude/skills/qa-load-test/scripts/load-test.js \
-  http://localhost:3000 10 30
+# Verificar ingress disponível
+curl -s -o /dev/null -w "%{http_code}" -H "Host: compras.localhost" http://localhost/healthz
+# deve retornar 200
+```
 
-# Teste de estresse (50 usuários, 60s)
-node .claude/skills/qa-load-test/scripts/load-test.js \
-  http://localhost:3000 50 60
+## Execução rápida (via ingress)
 
-# Variáveis de ambiente para credenciais não-default
-LOCAL_AUTH_USER=loadtest LOCAL_AUTH_PASSWORD=loadtest123 \
-  node .claude/skills/qa-load-test/scripts/load-test.js \
-  http://localhost:3000 100 120
+```bash
+# Protocolo completo — 4 fases via ingress
+HOST_HEADER=compras.localhost \
+  node .claude/skills/qa-load-test/scripts/load-test.js http://localhost 5   30  # baseline
+HOST_HEADER=compras.localhost \
+  node .claude/skills/qa-load-test/scripts/load-test.js http://localhost 20  60  # ramp
+HOST_HEADER=compras.localhost \
+  node .claude/skills/qa-load-test/scripts/load-test.js http://localhost 50  60  # stress
+HOST_HEADER=compras.localhost \
+  node .claude/skills/qa-load-test/scripts/load-test.js http://localhost 100 60  # peak
+
+# Para produção (HTTPS, sem Host header):
+node .claude/skills/qa-load-test/scripts/load-test.js \
+  https://seu-dominio.com 50 60
 ```
 
 ## Monitoramento paralelo (terminal separado)

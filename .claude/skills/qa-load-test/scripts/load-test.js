@@ -12,11 +12,19 @@ const https = require('https');
 const { URL } = require('url');
 const fs    = require('fs');
 
-const BASE_URL  = process.argv[2] || 'http://localhost:3000';
-const MAX_USERS = parseInt(process.argv[3] || '10');
-const DURATION  = parseInt(process.argv[4] || '30');
-const AUTH_USER = process.env.LOCAL_AUTH_USER     || 'loadtest';
-const AUTH_PASS = process.env.LOCAL_AUTH_PASSWORD || 'loadtest123';
+// Agents com keepAlive — reutilizam conexões TCP, essencial para
+// evitar esgotar o port-forward ou o ingress com novas conexões por request
+const httpAgent  = new http.Agent({ keepAlive: true, maxSockets: 100, maxFreeSockets: 20 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100, maxFreeSockets: 20 });
+
+const BASE_URL   = process.argv[2] || 'http://localhost:3000';
+const MAX_USERS  = parseInt(process.argv[3] || '10');
+const DURATION   = parseInt(process.argv[4] || '30');
+const AUTH_USER  = process.env.LOCAL_AUTH_USER     || 'loadtest';
+const AUTH_PASS  = process.env.LOCAL_AUTH_PASSWORD || 'loadtest123';
+// HOST_HEADER: necessário para nginx ingress com virtual hosting
+// Ex: HOST_HEADER=compras.localhost para testar via http://localhost (porta 80)
+const HOST_HEADER = process.env.HOST_HEADER || null;
 
 // ── Metrics store ──────────────────────────────────────────────────────
 const m = { times: {}, errors: {}, start: Date.now() };
@@ -30,20 +38,22 @@ function rec(op, ms, ok) {
 function request(method, path, body, cookies) {
   return new Promise((resolve, reject) => {
     const u   = new URL(path, BASE_URL);
-    const lib = u.protocol === 'https:' ? https : http;
     const isJson = body && typeof body === 'object';
     const bodyStr = body ? (isJson ? JSON.stringify(body) : body) : null;
     const ct = bodyStr
       ? (isJson ? 'application/json' : 'application/x-www-form-urlencoded')
       : null;
 
+    const isHttps = u.protocol === 'https:';
     const opts = {
       hostname: u.hostname,
-      port:     u.port || (u.protocol === 'https:' ? 443 : 80),
+      port:     u.port || (isHttps ? 443 : 80),
       path:     u.pathname + u.search,
       method,
+      agent:    isHttps ? httpsAgent : httpAgent,
       headers: {
         Accept: 'application/json',
+        ...(HOST_HEADER ? { Host: HOST_HEADER } : {}),
         ...(cookies ? { Cookie: cookies } : {}),
         ...(ct ? { 'Content-Type': ct } : {}),
         ...(bodyStr ? { 'Content-Length': Buffer.byteLength(bodyStr) } : {}),
@@ -51,7 +61,7 @@ function request(method, path, body, cookies) {
     };
 
     const t0 = Date.now();
-    const req = lib.request(opts, res => {
+    const req = (isHttps ? https : http).request(opts, res => {
       let data = '';
       res.on('data', c => (data += c));
       res.on('end', () =>
