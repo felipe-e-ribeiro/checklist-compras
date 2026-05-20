@@ -152,6 +152,16 @@ node .claude/skills/qa-load-test/scripts/load-test.js http://localhost:3000 100 
 
 ## Docker & Kubernetes
 
+**Skills locais disponíveis** (`.claude/skills/`):
+- `kind-ops` — setup, redeploy, logs HTTP (morgan), metrics-server, diagnóstico
+- `qa-load-test` — testes de carga, relatórios, análise de gargalos
+- `workspace-ux` — regras de negócio e guardrails do sistema de workspaces
+
+**Setup completo automatizado (inclui metrics-server):**
+```bash
+bash scripts/kind-setup.sh
+```
+
 **Build image** (uses `node:lts` Debian — Alpine causes musl/glibc bcrypt incompatibility):
 ```bash
 docker build -t feliperibeiro95/checklist-compras:latest .

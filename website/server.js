@@ -11,6 +11,7 @@ const { createClient } = require('redis');
 const passport = require('passport');
 const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
 
+const morgan = require('morgan');
 const { makeRequireAuth, makeRequireTenant } = require('./middleware/auth');
 const makeAuthRouter = require('./routes/auth');
 const makeAccessRouter = require('./routes/access');
@@ -20,6 +21,11 @@ const authService = require('./services/authService');
 
 function createApp(db) {
   const app = express();
+
+  // HTTP request logging — desabilitado em testes para não poluir output
+  if (process.env.NODE_ENV !== 'test') {
+    app.use(morgan(':method :url :status :response-time ms'));
+  }
 
   app.use(bodyParser.urlencoded({ extended: true }));
   app.use(bodyParser.json());
