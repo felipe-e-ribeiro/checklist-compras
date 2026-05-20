@@ -82,6 +82,11 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+    # HTTPS para Google OAuth (token exchange + callback)
+    # O servidor precisa chamar oauth2.googleapis.com para trocar o código pelo token
+    - ports:
+        - port: 443
+          protocol: TCP
 
 # ── 4. PostgreSQL: só recebe do app e do migration job ────────────────
 ---
