@@ -265,6 +265,14 @@
       document.querySelectorAll('.item-row').forEach((row) => {
         if (row.querySelector('.item-checkbox-input')?.checked) row.remove();
       });
+      // Mostrar estado vazio se não sobrou nenhum item
+      if (!document.querySelector('.item-row') && !document.getElementById('empty-state')) {
+        const empty = document.createElement('li');
+        empty.id = 'empty-state';
+        empty.className = 'item-empty';
+        empty.innerHTML = '<div class="item-empty-icon">🛒</div><div>Sua lista está vazia.<br>Adicione o primeiro item acima.</div>';
+        document.getElementById('item-list').appendChild(empty);
+      }
     });
     function checkItem(id, checked) {
       fetch('/app/check', {
@@ -399,10 +407,37 @@
     }
     <% } %>
 
-    // ── Add form ──────────────────────────────────────────────────────
-    document.getElementById('add-form').addEventListener('submit', () => {
-      setTimeout(() => document.getElementById('item-input')?.focus(), 100);
+    // ── Add form — fetch sem page reload; Socket.IO trata o DOM ─────────
+    document.getElementById('add-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('item-input');
+      const item = input.value.trim();
+      if (!item) return;
+
+      const res = await fetch('/app/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+        },
+        body: new URLSearchParams({ item }),
+      });
+
+      if (res.ok) {
+        input.value = '';
+        input.focus();
+      }
     });
+
+    // ── Clear checked — fetch sem page reload; Socket.IO trata o DOM ────
+    document.querySelector('form[action="/app/clear-checked"]')
+      .addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await fetch('/app/clear-checked', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' },
+        });
+      });
   </script>
 </body>
 </html>

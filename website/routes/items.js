@@ -54,7 +54,7 @@ function makeItemsRouter(db, requireAuth, requireTenant, io) {
 
   router.post('/app/clear-checked', requireAuth, requireTenant, async (req, res) => {
     await itemService.archiveChecked(req.tenantId, db);
-    io.to(req.tenantId).emit('item-checked');
+    io.to(req.tenantId).emit('items-cleared'); // evento correto — cliente escuta 'items-cleared'
 
     const fqdnUrl = process.env.FQDN_URL;
     if (fqdnUrl) {
@@ -68,7 +68,8 @@ function makeItemsRouter(db, requireAuth, requireTenant, io) {
       }
     }
 
-    return res.redirect('/app');
+    if (req.accepts('html')) return res.redirect('/app');
+    return res.status(200).json({ ok: true });
   });
 
   router.post('/app/check-archived', requireAuth, requireTenant, async (req, res) => {

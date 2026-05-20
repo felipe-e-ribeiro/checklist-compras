@@ -141,7 +141,7 @@ describe('POST /app/check', () => {
 });
 
 describe('POST /app/clear-checked', () => {
-  test('archives checked items of tenant', async () => {
+  test('archives checked items of tenant (HTML redirect)', async () => {
     const item = await insertItem(tenantA.id, 'ToArchive');
     await db.transaction(async (trx) => {
       await trx.raw(`SELECT set_config('app.current_tenant_id', ?, true)`, [tenantA.id]);
@@ -153,6 +153,20 @@ describe('POST /app/clear-checked', () => {
 
     const archived = await readItems(tenantA.id, { archived: true });
     expect(archived).toHaveLength(1);
+  });
+
+  test('archives checked items and returns JSON when Accept: application/json', async () => {
+    const item = await insertItem(tenantA.id, 'ToArchiveJSON');
+    await db.transaction(async (trx) => {
+      await trx.raw(`SELECT set_config('app.current_tenant_id', ?, true)`, [tenantA.id]);
+      await trx('items').where({ id: item.id }).update({ checked: true });
+    });
+
+    const res = await request(app).post('/app/clear-checked')
+      .set('Cookie', [cookieA()])
+      .set('Accept', 'application/json');
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
   });
 
   test('calls webhook with validateStatus and handles success', async () => {
