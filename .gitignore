@@ -1,0 +1,16 @@
+# Reports e arquivos temporários — gerados localmente, não publicar
+reports/*
+!reports/.gitkeep
+tmp/*
+!tmp/.gitkeep
+
+# Dependências
+node_modules/
+package-lock.json
+
+# Cobertura de testes
+website/coverage/
+
+# Variáveis de ambiente locais
+.env
+.env.local

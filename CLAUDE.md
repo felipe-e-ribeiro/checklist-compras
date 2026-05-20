@@ -147,7 +147,8 @@ node .claude/skills/qa-load-test/scripts/load-test.js http://localhost:3000 100 
 
 **Limites conhecidos (single pod):** ≤20 usuários P99 <1s ✓ | 50 usuários P99 ~4s ⚠ | 100 usuários P99 ~6s ⚠  
 **Elo mais fraco:** Knex pool (max:10) + `GET /app` abre 3 conexões simultâneas.  
-**Fix prioritário:** `pool: { max: 50 }` em `db.js` + separar query `allWorkspaces` do GET /app.
+**Fix prioritário:** `pool: { max: 50 }` em `db.js` + separar query `allWorkspaces` do GET /app.  
+**Relatórios gerados em:** `reports/` (ignorado pelo git). Arquivos temporários em: `tmp/` (ignorado).
 
 ## Docker & Kubernetes
 

@@ -286,7 +286,10 @@ async function main() {
   console.log(`    hpa.maxReplicas: ceil(${MAX_USERS} / users_per_pod)`);
 
   // ── Save JSON report ──────────────────────────────────────────────────
-  const reportFile = `qa-report-${Date.now()}.json`;
+  const reportsDir = require('path').join(__dirname, '../../../../reports');
+  if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir, { recursive: true });
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const reportFile = require('path').join(reportsDir, `qa-report-${dateStr}-${Date.now()}.json`);
   const report = {
     timestamp:   new Date().toISOString(),
     config:      { url: BASE_URL, maxUsers: MAX_USERS, durationS: DURATION },
