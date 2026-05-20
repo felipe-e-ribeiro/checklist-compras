@@ -1,16 +1,21 @@
-# Reports e arquivos temporários — gerados localmente, não publicar
+# Internal tooling — not for public consumption
+.claude/
+docs/
+CLAUDE.md
+
+# Reports and temp files
 reports/*
 !reports/.gitkeep
 tmp/*
 !tmp/.gitkeep
 
-# Dependências
+# Dependencies
 node_modules/
 package-lock.json
 
-# Cobertura de testes
+# Test coverage
 website/coverage/
 
-# Variáveis de ambiente locais
+# Local env overrides
 .env
 .env.local

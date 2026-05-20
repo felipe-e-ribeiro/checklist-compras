@@ -1,34 +1,68 @@
-namespace: "comprasweb"
-env: "prod"
-redishost: ""
+namespace: comprasweb-prod
+env: prod
+
+# PostgreSQL — recomenda-se banco gerenciado em produção (RDS, Cloud SQL, etc.)
+# Defina enabled: false e passe as credenciais via --set abaixo
+postgresql:
+  enabled: true           # set false to use external managed DB
+  storage: 10Gi
+  auth:
+    username: compras
+    password: "CHANGE_IN_PROD"   # --set postgresql.auth.password=...
+    database: lista_compras
+
+redis:
+  enabled: true
 
 comprasweb:
-  replicaCount: 1
+  replicaCount: 2
   image:
     repository: feliperibeiro95/checklist-compras
-    tag: "2.2.2"
+    tag: "RELEASE_TAG"         # set via CI/CD: --set comprasweb.image.tag=v2.x.x
+    pullPolicy: Always
   port: 3000
   serviceName: comprasweb
-  dbaccess:
-    usernamedb: ""
-    passwordb: ""
-    hostaddrdb: ""
-    databasename: ""
+  webConcurrency: "4"           # adjust based on pod CPU limit
+
+  # ── SECRETS — never commit real values ────────────────────────────────
+  # Pass all secrets via --set flags or external secret management
+  jwtSecret: "CHANGE_IN_PROD"
+  googleClientId: "CHANGE_IN_PROD"
+  googleClientSecret: "CHANGE_IN_PROD"
+  googleCallbackUrl: "https://your-domain.com/auth/google/callback"
+  appUrl: "https://your-domain.com"
+  localAuthEnabled: "false"     # keep false in production
+  localAuthUser: "loadtest"
+  localAuthPassword: "CHANGE_IN_PROD"
+
+  resources:
+    requests:
+      cpu: "300m"
+      memory: "384Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
 
 hpa:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 5
-  targetCPUUtilizationPercentage: 50
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 60
 
 ingress:
   enabled: true
-  ingressClassName: "nginx"
+  ingressClassName: nginx
   rewriteTarget: /
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  # cert-manager: requires cert-manager installed in the cluster
+  # and a ClusterIssuer named as configured below
+  certManager:
+    enabled: true
+    clusterIssuer: "letsencrypt-prod"   # use letsencrypt-staging to test first
+    # issuer: ""                         # use this instead for namespace-scoped Issuer
   hosts:
-    - host: "compras2.felipeduribeiro.com.br"
+    - host: "your-domain.com"
       paths:
         - path: /
           pathType: Prefix
@@ -38,5 +72,5 @@ ingress:
     enabled: true
     config:
       - hosts:
-          - "compras2.felipeduribeiro.com.br"
-        secretName: comprasweb-cert
+          - "your-domain.com"
+        secretName: comprasweb-tls    # cert-manager will create and manage this Secret

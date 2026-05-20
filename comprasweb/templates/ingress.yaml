@@ -3,9 +3,16 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ .Release.Name }}-ingress
+  namespace: {{ .Values.namespace }}
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/rewrite-target: {{ .Values.ingress.rewriteTarget | default "/" }}
+    {{- if .Values.ingress.certManager.enabled }}
+    {{- if .Values.ingress.certManager.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.certManager.clusterIssuer | quote }}
+    {{- else if .Values.ingress.certManager.issuer }}
+    cert-manager.io/issuer: {{ .Values.ingress.certManager.issuer | quote }}
+    {{- end }}
+    {{- end }}
     {{- if .Values.ingress.annotations }}
     {{- range $key, $value := .Values.ingress.annotations }}
     {{ $key }}: {{ $value | quote }}
@@ -28,7 +35,7 @@ spec:
                   number: {{ .port }}
           {{- end }}
     {{- end }}
-  {{- if and .Values.ingress.tls.enabled (not .Values.ingress.tls.disabled) }}
+  {{- if .Values.ingress.tls.enabled }}
   tls:
     {{- range .Values.ingress.tls.config }}
     - hosts:

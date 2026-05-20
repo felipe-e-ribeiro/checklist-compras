@@ -49,6 +49,8 @@ ingress:
   rewriteTarget: /
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  certManager:
+    enabled: false    # no cert-manager in kind local dev
   hosts:
     - host: compras.localhost
       paths:
