@@ -80,17 +80,8 @@ jobs:
           LOCAL_AUTH_ENABLED: "true"
           LOCAL_AUTH_USER: loadtest
           LOCAL_AUTH_PASSWORD: loadtest123
+        # jest.config.js enforces 100% via coverageThreshold — jest exits non-zero if coverage drops
         run: npm run test:coverage
-
-      - name: Enforce 100% coverage
-        working-directory: website
-        run: |
-          node -e "
-            const s = require('./coverage/coverage-summary.json');
-            const pct = s.total.lines.pct;
-            if (pct < 100) { console.error('Coverage: ' + pct + '% — must be 100%'); process.exit(1); }
-            console.log('Coverage OK: ' + pct + '%');
-          "
 
   trivy:
     runs-on: ubuntu-latest
