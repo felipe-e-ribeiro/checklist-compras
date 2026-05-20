@@ -22,7 +22,6 @@ const authService = require('./services/authService');
 function createApp(db) {
   const app = express();
 
-  // HTTP request logging — desabilitado em testes para não poluir output
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan(':method :url :status :response-time ms'));
   }
@@ -73,7 +72,24 @@ function createApp(db) {
   return { app, requireAuth, requireTenant };
 }
 
-function createServer(db) {
+// Configurar Redis adapter ANTES de aceitar conexões Socket.IO.
+// setupRedisAdapter é awaited em createServer para garantir que todos os
+// workers têm o Redis adapter ativo antes de qualquer socket conectar.
+// Sem isso, sockets que entram antes do adapter estar pronto ficam no
+// adapter in-memory local e não recebem eventos cross-worker.
+async function setupRedisAdapter(io) {
+  const pubClient = createClient({ url: process.env.REDIS_HOST || 'redis://localhost:6379' });
+  const subClient = pubClient.duplicate();
+
+  pubClient.on('error', (err) => console.error('Redis pub error:', err.message));
+  subClient.on('error', (err) => console.error('Redis sub error:', err.message));
+
+  await Promise.all([pubClient.connect(), subClient.connect()]);
+  io.adapter(createAdapter(pubClient, subClient));
+  console.log(`Worker ${process.pid} Redis adapter pronto`);
+}
+
+async function createServer(db) {
   const { app, requireAuth, requireTenant } = createApp(db);
   const server = http.createServer(app);
   const io = new Server(server);
@@ -101,7 +117,9 @@ function createServer(db) {
     if (socket.tenantId) socket.join(socket.tenantId);
   });
 
-  setupRedisAdapter(io);
+  // Aguardar Redis ANTES de registrar rotas e retornar o servidor.
+  // Garante que qualquer socket que conectar já usa o adapter correto.
+  await setupRedisAdapter(io);
 
   app.use(makeAuthRouter(db));
   app.use(makeAccessRouter(db));
@@ -109,17 +127,6 @@ function createServer(db) {
   app.use(makeItemsRouter(db, requireAuth, requireTenant, io));
 
   return server;
-}
-
-async function setupRedisAdapter(io) {
-  try {
-    const pubClient = createClient({ url: process.env.REDIS_HOST || 'redis://localhost:6379' });
-    const subClient = pubClient.duplicate();
-    await Promise.all([pubClient.connect(), subClient.connect()]);
-    io.adapter(createAdapter(pubClient, subClient));
-  } catch (err) {
-    console.error('Redis adapter error:', err.message);
-  }
 }
 
 function createTestApp(db) {
@@ -134,9 +141,6 @@ function createTestApp(db) {
 
 if (require.main === module) {
   const cluster = require('cluster');
-
-  // WEB_CONCURRENCY controla o número de workers.
-  // Não usar os.cpus().length em containers — retorna CPUs do host, não do limit.
   const WORKERS = parseInt(process.env.WEB_CONCURRENCY) || 2;
 
   if (cluster.isPrimary && WORKERS > 1) {
@@ -149,10 +153,16 @@ if (require.main === module) {
   } else {
     const db = require('./db');
     const PORT = process.env.PORT || 3000;
-    const server = createServer(db);
-    server.listen(PORT, () =>
-      console.log(`Worker ${process.pid} em http://0.0.0.0:${PORT}`)
-    );
+    createServer(db)
+      .then((server) => {
+        server.listen(PORT, () =>
+          console.log(`Worker ${process.pid} em http://0.0.0.0:${PORT}`)
+        );
+      })
+      .catch((err) => {
+        console.error(`Worker ${process.pid} falhou ao iniciar:`, err.message);
+        process.exit(1);
+      });
   }
 }
 
