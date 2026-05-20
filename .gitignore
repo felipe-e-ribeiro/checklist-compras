@@ -19,3 +19,6 @@ website/coverage/
 # Local env overrides
 .env
 .env.local
+
+.mcp.json
+config-mcp

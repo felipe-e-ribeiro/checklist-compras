@@ -5,7 +5,9 @@ env: prod
 # Defina enabled: false e passe as credenciais via --set abaixo
 postgresql:
   enabled: true           # set false to use external managed DB
-  storage: 10Gi
+  storage: 20Gi
+  storageClassName: nfs-comprasweb
+  accessMode: ReadWriteMany
   auth:
     username: compras
     password: "CHANGE_IN_PROD"   # --set postgresql.auth.password=...
@@ -54,7 +56,10 @@ ingress:
   ingressClassName: nginx
   rewriteTarget: /
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.org/websocket-services: "comprasweb"
+    nginx.org/proxy-read-timeout: "3600"
+    nginx.org/proxy-send-timeout: "3600"
+    nginx.org/redirect-to-https: "True"
   # cert-manager: requires cert-manager installed in the cluster
   # and a ClusterIssuer named as configured below
   certManager:

@@ -1,15 +1,22 @@
 {{- if .Values.postgresql.enabled }}
+{{- $pvcName := printf "%s-postgresql-pvc" .Release.Name }}
+{{- if not (lookup "v1" "PersistentVolumeClaim" .Values.namespace $pvcName) }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: "{{ .Release.Name }}-postgresql-pvc"
+  name: {{ $pvcName }}
   namespace: {{ .Values.namespace }}
 spec:
-  accessModes: [ReadWriteOnce]
+  accessModes:
+    - {{ .Values.postgresql.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.postgresql.storageClassName }}
+  storageClassName: {{ .Values.postgresql.storageClassName }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.postgresql.storage | default "1Gi" }}
+{{- end }}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
