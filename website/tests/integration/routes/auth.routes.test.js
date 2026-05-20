@@ -25,6 +25,16 @@ function parseCookies(res) {
   return cookies;
 }
 
+// ── GET /login ───────────────────────────────────────────────────────────────
+
+describe('GET /login', () => {
+  test('renders login page', async () => {
+    const res = await request(app).get('/login');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Entrar com Google');
+  });
+});
+
 // ── OAuth callback (tested directly to bypass passport) ──────────────────────
 
 describe('_handleOAuthCallback', () => {

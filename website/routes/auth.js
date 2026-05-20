@@ -16,6 +16,8 @@ async function _handleOAuthCallback(req, res, db) {
 function makeAuthRouter(db) {
   const router = express.Router();
 
+  router.get('/login', (_req, res) => res.render('login'));
+
   router.get('/auth/google',
     passport.authenticate('google', { scope: ['profile', 'email'], session: false })
   );

@@ -37,7 +37,7 @@ describe('no access token', () => {
     const next = jest.fn();
     await requireAuth(req, res, next);
     expect(next).not.toHaveBeenCalled();
-    expect(res.redirect).toHaveBeenCalledWith('/auth/google');
+    expect(res.redirect).toHaveBeenCalledWith('/login');
   });
 });
 
@@ -48,7 +48,7 @@ describe('invalid token signature', () => {
     const next = jest.fn();
     await requireAuth(req, res, next);
     expect(next).not.toHaveBeenCalled();
-    expect(res.redirect).toHaveBeenCalledWith('/auth/google');
+    expect(res.redirect).toHaveBeenCalledWith('/login');
   });
 });
 
@@ -101,7 +101,7 @@ describe('expired token with invalid refresh', () => {
     const next = jest.fn();
     await requireAuth(req, res, next);
     expect(next).not.toHaveBeenCalled();
-    expect(res.redirect).toHaveBeenCalledWith('/auth/google');
+    expect(res.redirect).toHaveBeenCalledWith('/login');
   });
 });
 
@@ -119,6 +119,6 @@ describe('expired token + DB error during refresh', () => {
     const next = jest.fn();
     await auth(req, res, next);
     expect(next).not.toHaveBeenCalled();
-    expect(res.redirect).toHaveBeenCalledWith('/auth/google');
+    expect(res.redirect).toHaveBeenCalledWith('/login');
   });
 });

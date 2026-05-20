@@ -28,7 +28,7 @@ describe('GET /select-workspace — unauthenticated', () => {
   test('redirects to /auth/google', async () => {
     const res = await request(app).get('/select-workspace');
     expect(res.status).toBe(302);
-    expect(res.headers.location).toBe('/auth/google');
+    expect(res.headers.location).toBe('/login');
   });
 });
 
@@ -135,10 +135,10 @@ describe('POST /create-workspace', () => {
 });
 
 describe('GET /join — invite flow', () => {
-  test('redirects to /auth/google if not authenticated', async () => {
+  test('redirects to /login if not authenticated', async () => {
     const res = await request(app).get('/join?token=abc');
     expect(res.status).toBe(302);
-    expect(res.headers.location).toMatch(/auth\/google/);
+    expect(res.headers.location).toMatch(/login/);
   });
 
   test('accepts valid invite and redirects to /app', async () => {

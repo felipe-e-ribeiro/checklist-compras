@@ -55,7 +55,7 @@ describe('GET /app — unauthenticated', () => {
   test('redirects to /auth/google', async () => {
     const res = await request(app).get('/app');
     expect(res.status).toBe(302);
-    expect(res.headers.location).toBe('/auth/google');
+    expect(res.headers.location).toBe('/login');
   });
 });
 

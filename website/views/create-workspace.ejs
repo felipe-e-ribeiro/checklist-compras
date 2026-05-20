@@ -1,22 +1,56 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
-  <title>Criar Ambiente</title>
+  <title>Criar Ambiente — Lista de Compras</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div class="container mt-5">
-    <h1>Criar Ambiente</h1>
-    <p>Crie um ambiente compartilhado para sua lista de compras.</p>
-    <form method="POST" action="/create-workspace" class="mt-3">
-      <div class="form-group">
-        <label for="name">Nome do ambiente</label>
-        <input type="text" class="form-control" id="name" name="name" placeholder="Ex: Família Silva" required>
+  <div class="page-center">
+    <div class="page-card">
+      <div class="page-card-header">
+        <div class="brand" style="margin-bottom:24px">
+          <div class="brand-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+              <line x1="3" y1="6" x2="21" y2="6"/>
+              <path d="M16 10a4 4 0 01-8 0"/>
+            </svg>
+          </div>
+          Lista de Compras
+        </div>
+        <h2 class="page-card-title">Criar Ambiente</h2>
+        <p class="page-card-sub">Dê um nome ao seu espaço compartilhado. Você poderá convidar outras pessoas depois.</p>
       </div>
-      <button type="submit" class="btn btn-success">Criar</button>
-    </form>
+
+      <form method="POST" action="/create-workspace">
+        <div class="form-field">
+          <label class="form-label" for="name">Nome do ambiente</label>
+          <input
+            class="input-field"
+            type="text"
+            id="name"
+            name="name"
+            placeholder="Ex: Família Silva"
+            required
+            autocomplete="off"
+            autofocus
+          >
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;height:50px;font-size:15px">
+          Criar ambiente
+        </button>
+      </form>
+
+      <div class="divider"></div>
+      <a href="/select-workspace" class="btn btn-ghost" style="width:100%">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Voltar
+      </a>
+    </div>
   </div>
 </body>
 </html>

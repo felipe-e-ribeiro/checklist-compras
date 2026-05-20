@@ -22,19 +22,19 @@ function makeRequireAuth(db) {
       if (err.name === 'TokenExpiredError') {
         return _tryRefresh(req, res, next, jwt.decode(accessToken), db);
       }
-      return res.redirect('/auth/google');
+      return res.redirect('/login');
     }
   };
 }
 
 async function _tryRefresh(req, res, next, decoded, db) {
   const refreshToken = req.cookies && req.cookies.refresh_token;
-  if (!refreshToken || !decoded) return res.redirect('/auth/google');
+  if (!refreshToken || !decoded) return res.redirect('/login');
 
   try {
     const userId = decoded.sub;
     const record = await authService.validateRefreshToken(refreshToken, userId, db);
-    if (!record) return res.redirect('/auth/google');
+    if (!record) return res.redirect('/login');
 
     const { newToken } = await authService.rotateRefreshToken(record, userId, db);
     const user = await db('users').where({ id: userId }).first();
@@ -47,7 +47,7 @@ async function _tryRefresh(req, res, next, decoded, db) {
     req.user = authService.verifyAccessToken(newAccess);
     return next();
   } catch {
-    return res.redirect('/auth/google');
+    return res.redirect('/login');
   }
 }
 

@@ -1,81 +1,176 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
   <title>Lista de Compras</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <script src="/socket.io/socket.io.js"></script>
 
-  <nav class="navbar navbar-expand navbar-light bg-light px-3">
-    <span class="navbar-brand">Lista de Compras</span>
-    <div class="ml-auto d-flex align-items-center">
-      <button class="btn btn-sm btn-outline-secondary mr-2" id="theme-toggle">Tema</button>
-      <span class="mr-3 text-muted small"><%= user.email %></span>
+  <!-- Navbar -->
+  <nav class="nav">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <path d="M16 10a4 4 0 01-8 0"/>
+        </svg>
+      </div>
+      Lista de Compras
+    </div>
+    <div class="nav-right">
+      <span class="nav-email"><%= user.email %></span>
+      <button class="btn-icon" id="theme-toggle" title="Alternar tema">
+        <svg id="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg id="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+        </svg>
+      </button>
       <form method="POST" action="/auth/logout" style="display:inline">
-        <button type="submit" class="btn btn-sm btn-outline-danger">Sair</button>
+        <button class="btn btn-ghost btn-sm" type="submit">Sair</button>
       </form>
     </div>
   </nav>
 
-  <div class="container mt-4">
-    <div class="row mb-3">
-      <div class="col-sm-12 col-md-6">
-        <form id="add-form" method="POST" action="/app/add" class="form-inline">
-          <input class="form-control mr-2" type="text" id="item-input" name="item" placeholder="Adicionar item" required>
-          <button class="btn btn-outline-success" type="submit">Adicionar</button>
-        </form>
-      </div>
-      <div class="col-sm-12 col-md-6 d-flex align-items-center">
-        <form method="POST" action="/app/clear-checked" class="mr-2">
-          <button class="btn btn-outline-danger" type="submit">Limpar Concluídos</button>
-        </form>
-        <button class="btn btn-outline-secondary" id="invite-btn">Convidar</button>
-      </div>
-    </div>
+  <!-- Main -->
+  <main class="app-container fade-in">
+    <!-- Add item -->
+    <form id="add-form" class="add-bar" method="POST" action="/app/add">
+      <input class="input-field" type="text" id="item-input" name="item" placeholder="Adicionar item à lista…" required autocomplete="off">
+      <button class="btn btn-primary" type="submit">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Adicionar
+      </button>
+    </form>
 
-    <ul class="list-group" id="item-list">
-      <li class="list-group-header">
-        <div class="sort-buttons">
-          <button class="btn btn-primary sort-button" data-sort="item">Alfabética</button>
-          <button class="btn btn-primary sort-button" data-sort="checked">Checado</button>
+    <!-- List -->
+    <div class="item-list-wrap">
+      <!-- Sort / actions bar -->
+      <div class="sort-bar">
+        <div class="sort-tabs">
+          <button class="sort-tab <%= sortBy === 'item' ? 'active' : '' %>" data-sort="item">Alfabética</button>
+          <button class="sort-tab <%= sortBy === 'checked' ? 'active' : '' %>" data-sort="checked">Concluídos</button>
         </div>
-      </li>
-      <% items.forEach(function(item) { %>
-        <li class="list-group-item" data-id="<%= item.id %>">
-          <input type="checkbox" name="checked" onchange="checkItem('<%= item.id %>', this.checked)" <%= item.checked ? 'checked' : '' %>>
-          <%= item.item %>
-        </li>
-      <% }); %>
-    </ul>
-  </div>
+        <div class="sort-actions">
+          <button class="btn btn-ghost btn-sm" id="invite-btn" title="Convidar alguém">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+            </svg>
+            Convidar
+          </button>
+          <form method="POST" action="/app/clear-checked">
+            <button type="submit" class="btn btn-danger-ghost">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 11 12 14 22 4"/>
+                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+              </svg>
+              Limpar concluídos
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Items -->
+      <ul class="item-list" id="item-list">
+        <% if (items.length === 0) { %>
+          <li class="item-empty" id="empty-state">
+            <div class="item-empty-icon">🛒</div>
+            <div>Sua lista está vazia.<br>Adicione o primeiro item acima.</div>
+          </li>
+        <% } %>
+        <% items.forEach(function(item) { %>
+          <li class="item-row" data-id="<%= item.id %>">
+            <label class="item-label">
+              <input class="item-checkbox-input" type="checkbox" onchange="checkItem('<%= item.id %>', this.checked)" <%= item.checked ? 'checked' : '' %>>
+              <span class="item-box">
+                <svg viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="1.5,5 4.5,8 10.5,1.5"/>
+                </svg>
+              </span>
+              <span class="item-text"><%= item.item %></span>
+            </label>
+          </li>
+        <% }); %>
+      </ul>
+    </div>
+  </main>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toast-container"></div>
 
   <script>
+    // ── Theme ─────────────────────────────────────────────────────────
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = localStorage.getItem('theme') || (prefersDark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+    updateThemeIcon(theme);
+
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      updateThemeIcon(next);
+    });
+    function updateThemeIcon(t) {
+      document.getElementById('icon-sun').style.display  = t === 'dark'  ? 'block' : 'none';
+      document.getElementById('icon-moon').style.display = t === 'light' ? 'block' : 'none';
+    }
+
+    // ── Sort ──────────────────────────────────────────────────────────
+    document.querySelectorAll('.sort-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        window.location.href = `/app?sortBy=${btn.dataset.sort}`;
+      });
+    });
+
+    // ── Socket.IO ─────────────────────────────────────────────────────
     const socket = io({ auth: { tenantId: '<%= tenantId %>' } });
 
     socket.on('item-added', (data) => {
+      document.getElementById('empty-state')?.remove();
       const list = document.getElementById('item-list');
       const li = document.createElement('li');
-      li.className = 'list-group-item';
+      li.className = 'item-row';
       li.dataset.id = data.id;
-      li.innerHTML = `<input type="checkbox" name="checked" onchange="checkItem('${data.id}', this.checked)"> ${data.item}`;
+      li.innerHTML = `
+        <label class="item-label">
+          <input class="item-checkbox-input" type="checkbox" onchange="checkItem('${data.id}', this.checked)">
+          <span class="item-box">
+            <svg viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1.5,5 4.5,8 10.5,1.5"/>
+            </svg>
+          </span>
+          <span class="item-text">${data.item}</span>
+        </label>`;
       list.appendChild(li);
     });
 
     socket.on('item-checked', (data) => {
       if (!data || !data.id) return;
-      const el = document.querySelector(`li[data-id="${data.id}"] input`);
-      if (el) el.checked = !!data.checked;
+      const input = document.querySelector(`li[data-id="${data.id}"] .item-checkbox-input`);
+      if (input) input.checked = !!data.checked;
     });
 
     socket.on('items-cleared', () => {
-      document.querySelectorAll('li.list-group-item').forEach((li) => {
-        if (li.querySelector('input') && li.querySelector('input').checked) li.remove();
+      document.querySelectorAll('.item-row').forEach((row) => {
+        const cb = row.querySelector('.item-checkbox-input');
+        if (cb && cb.checked) row.remove();
       });
     });
 
+    // ── Check item ────────────────────────────────────────────────────
     function checkItem(id, checked) {
       fetch('/app/check', {
         method: 'POST',
@@ -84,30 +179,44 @@
       });
     }
 
-    document.querySelectorAll('.sort-button').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        window.location.href = `/app?sortBy=${btn.getAttribute('data-sort')}`;
-      });
+    // ── Clear form (focus restore) ────────────────────────────────────
+    document.getElementById('add-form').addEventListener('submit', () => {
+      setTimeout(() => document.getElementById('item-input').focus(), 100);
     });
 
+    // ── Invite toast ──────────────────────────────────────────────────
     document.getElementById('invite-btn').addEventListener('click', async () => {
       const res = await fetch('/workspace/invite', { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        prompt('Compartilhe este link de convite:', data.inviteUrl);
-      }
+      if (!res.ok) return;
+      const { inviteUrl } = await res.json();
+      showInviteToast(inviteUrl);
     });
 
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = localStorage.getItem('theme') || (prefersDark ? 'dark' : 'light');
-    document.documentElement.setAttribute('data-theme', theme);
+    function showInviteToast(url) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = `
+        <span style="flex-shrink:0;font-size:13px;color:rgba(255,255,255,.7)">Link de convite:</span>
+        <span class="toast-url" title="${url}">${url}</span>
+        <button class="toast-copy" onclick="copyInvite('${url}', this)">Copiar</button>
+        <button onclick="closeToast(this.closest('.toast'))" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;padding:0 4px;font-size:18px;line-height:1">×</button>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => closeToast(toast), 20000);
+    }
 
-    document.getElementById('theme-toggle').addEventListener('click', () => {
-      const current = document.documentElement.getAttribute('data-theme');
-      const next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('theme', next);
-    });
+    function copyInvite(url, btn) {
+      navigator.clipboard.writeText(url).then(() => {
+        btn.textContent = '✓ Copiado';
+        setTimeout(() => { btn.textContent = 'Copiar'; }, 2000);
+      });
+    }
+
+    function closeToast(el) {
+      el.classList.add('exit');
+      setTimeout(() => el.remove(), 220);
+    }
   </script>
 </body>
 </html>
