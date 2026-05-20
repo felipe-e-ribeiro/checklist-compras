@@ -65,6 +65,13 @@ describe('migrations', () => {
     expect(result.rows.length).toBe(1);
   });
 
+  test('users has anonymized_at column', async () => {
+    const result = await db.raw(
+      `SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='anonymized_at'`
+    );
+    expect(result.rows.length).toBe(1);
+  });
+
   test('items has quantity column (varchar 25)', async () => {
     const result = await db.raw(
       `SELECT character_maximum_length FROM information_schema.columns

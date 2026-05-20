@@ -25,6 +25,67 @@ function parseCookies(res) {
   return cookies;
 }
 
+// ── GET /privacy ─────────────────────────────────────────────────────────────
+
+describe('GET /privacy', () => {
+  test('renders privacy policy page', async () => {
+    const res = await request(app).get('/privacy');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Privacidade');
+  });
+});
+
+// ── GET /account/export ───────────────────────────────────────────────────────
+
+describe('GET /account/export', () => {
+  test('returns user data as JSON download when authenticated', async () => {
+    const [user] = await db('users').insert({ google_id: 'gexp1', email: 'exp@t.com', name: 'Exp' }).returning('*');
+    const token = authService.signAccessToken({ sub: user.id, email: user.email });
+    const res = await request(app).get('/account/export')
+      .set('Cookie', [`access_token=${token}`]);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/json/);
+    const data = JSON.parse(res.text);
+    expect(data.account.email).toBe('exp@t.com');
+  });
+
+  test('redirects to /login when not authenticated', async () => {
+    const res = await request(app).get('/account/export');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/login');
+  });
+
+  test('redirects to /login when token is invalid', async () => {
+    const res = await request(app).get('/account/export')
+      .set('Cookie', ['access_token=invalid.token.here']);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/login');
+  });
+});
+
+// ── POST /account/delete ──────────────────────────────────────────────────────
+
+describe('POST /account/delete', () => {
+  test('anonymizes user data and redirects to /login?deleted=1', async () => {
+    const [user] = await db('users').insert({ google_id: 'gdel1', email: 'del@t.com', name: 'Del' }).returning('*');
+    const token = authService.signAccessToken({ sub: user.id, email: user.email });
+    const res = await request(app).post('/account/delete')
+      .set('Cookie', [`access_token=${token}`]);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/login?deleted=1');
+    const updated = await db('users').where({ id: user.id }).first();
+    expect(updated.email).toMatch(/^deleted-/);
+    expect(updated.name).toBeNull();
+    expect(updated.anonymized_at).not.toBeNull();
+  });
+
+  test('redirects to /login when no token present (nothing to delete)', async () => {
+    const res = await request(app).post('/account/delete');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/login');
+  });
+});
+
 // ── GET /login ───────────────────────────────────────────────────────────────
 
 describe('GET /login', () => {

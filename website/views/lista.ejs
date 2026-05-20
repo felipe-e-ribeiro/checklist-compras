@@ -71,8 +71,16 @@
           <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
         </svg>
       </button>
+      <a href="/privacy" class="btn btn-ghost btn-sm" title="Privacidade">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </a>
       <form method="POST" action="/auth/logout" style="display:inline">
         <button class="btn btn-ghost btn-sm" type="submit">Sair</button>
+      </form>
+      <form method="POST" action="/account/delete" id="delete-account-form" style="display:inline">
+        <button type="button" class="btn btn-ghost btn-sm" id="delete-account-btn" title="Deletar conta" style="color:var(--danger)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
       </form>
     </div>
   </nav>
@@ -517,6 +525,13 @@
       }, 1000);
     }
     <% } %>
+
+    // ── Deletar conta (confirmação inline) ───────────────────────────────
+    document.getElementById('delete-account-btn')?.addEventListener('click', () => {
+      if (confirm('Tem certeza? Seus dados pessoais serão anonimizados e sua sessão encerrada.')) {
+        document.getElementById('delete-account-form').submit();
+      }
+    });
 
     // ── Add form — fetch sem page reload; Socket.IO trata o DOM ─────────
     document.getElementById('add-form').addEventListener('submit', async (e) => {

@@ -2,6 +2,7 @@ const express = require('express');
 const passport = require('passport');
 const authService = require('../services/authService');
 const { COOKIE_OPTS } = require('../middleware/auth');
+const { anonymizeUser, exportUserData } = require('../services/userService');
 
 async function _handleOAuthCallback(req, res, db) {
   const user = req.user;
@@ -16,7 +17,9 @@ async function _handleOAuthCallback(req, res, db) {
 function makeAuthRouter(db) {
   const router = express.Router();
 
-  router.get('/login', (_req, res) => res.render('login'));
+  router.get('/login', (req, res) => res.render('login', { query: req.query }));
+
+  router.get('/privacy', (_req, res) => res.render('privacy'));
 
   router.get('/auth/google',
     passport.authenticate('google', { scope: ['profile', 'email'], session: false })
@@ -78,6 +81,36 @@ function makeAuthRouter(db) {
     res.clearCookie('access_token', COOKIE_OPTS);
     res.clearCookie('refresh_token', COOKIE_OPTS);
     res.redirect('/login');
+  });
+
+  // ── Exportar dados (RGPD Art. 20 — portabilidade) ───────────────────
+  router.get('/account/export', async (req, res) => {
+    const accessToken = req.cookies && req.cookies.access_token;
+    if (!accessToken) return res.redirect('/login');
+    try {
+      const payload = authService.verifyAccessToken(accessToken);
+      const data = await exportUserData(payload.sub, db);
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename="meus-dados.json"');
+      return res.send(JSON.stringify(data, null, 2));
+    } catch {
+      return res.redirect('/login');
+    }
+  });
+
+  // ── Deletar conta (RGPD Art. 17 — direito ao esquecimento) ──────────
+  router.post('/account/delete', async (req, res) => {
+    const accessToken = req.cookies && req.cookies.access_token;
+    if (!accessToken) return res.redirect('/login');
+    try {
+      const payload = authService.verifyAccessToken(accessToken);
+      await anonymizeUser(payload.sub, db);
+    } catch {
+      // token expirado — tentar pelo refresh
+    }
+    res.clearCookie('access_token', COOKIE_OPTS);
+    res.clearCookie('refresh_token', COOKIE_OPTS);
+    return res.redirect('/login?deleted=1');
   });
 
   return router;
