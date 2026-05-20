@@ -8,8 +8,27 @@ function makeItemsRouter(db, requireAuth, requireTenant, io) {
 
   router.get('/app', requireAuth, requireTenant, async (req, res) => {
     const sortBy = req.query.sortBy || 'item';
-    const items = await itemService.listItems(req.tenantId, sortBy, db);
-    res.render('lista', { items, sortBy, user: req.user, tenantId: req.tenantId });
+    const [items, members, allWorkspaces] = await Promise.all([
+      itemService.listItems(req.tenantId, sortBy, db),
+      db('tenant_members')
+        .join('users', 'users.id', 'tenant_members.user_id')
+        .where('tenant_members.tenant_id', req.tenantId)
+        .select('users.id', 'users.name', 'users.email', 'tenant_members.role')
+        .orderBy('tenant_members.joined_at', 'asc'),
+      db('tenant_members')
+        .join('tenants', 'tenants.id', 'tenant_members.tenant_id')
+        .where('tenant_members.user_id', req.user.sub)
+        .select('tenants.id', 'tenants.name', 'tenant_members.role')
+        .orderBy('tenants.name', 'asc'),
+    ]);
+
+    const userRole = members.find((m) => m.id === req.user.sub)?.role;
+    const ownedCount = allWorkspaces.filter((w) => w.role === 'owner').length;
+
+    res.render('lista', {
+      items, sortBy, user: req.user, tenantId: req.tenantId,
+      members, allWorkspaces, userRole, ownedCount,
+    });
   });
 
   router.post('/app/add', requireAuth, requireTenant, async (req, res) => {

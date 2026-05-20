@@ -97,7 +97,7 @@ function createServer(db) {
   setupRedisAdapter(io);
 
   app.use(makeAuthRouter(db));
-  app.use(makeWorkspaceRouter(db, requireAuth));
+  app.use(makeWorkspaceRouter(db, requireAuth, requireTenant));
   app.use(makeItemsRouter(db, requireAuth, requireTenant, io));
 
   return server;
@@ -118,7 +118,7 @@ function createTestApp(db) {
   const { app, requireAuth, requireTenant } = createApp(db);
   const io = { to: () => ({ emit: () => {} }) };
   app.use(makeAuthRouter(db));
-  app.use(makeWorkspaceRouter(db, requireAuth));
+  app.use(makeWorkspaceRouter(db, requireAuth, requireTenant));
   app.use(makeItemsRouter(db, requireAuth, requireTenant, io));
   return app;
 }

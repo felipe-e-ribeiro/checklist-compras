@@ -3,6 +3,9 @@ const authService = require('../services/authService');
 const inviteService = require('../services/inviteService');
 const { COOKIE_OPTS } = require('../middleware/auth');
 
+const OWNED_LIMIT = 3;
+const TOTAL_LIMIT = 9;
+
 function slugify(name) {
   return name
     .toLowerCase()
@@ -11,9 +14,24 @@ function slugify(name) {
     .substring(0, 60);
 }
 
-function makeWorkspaceRouter(db, requireAuth) {
+async function getOwnedCount(userId, db) {
+  const [{ count }] = await db('tenant_members')
+    .where({ user_id: userId, role: 'owner' })
+    .count('* as count');
+  return parseInt(count);
+}
+
+async function getTotalCount(userId, db) {
+  const [{ count }] = await db('tenant_members')
+    .where({ user_id: userId })
+    .count('* as count');
+  return parseInt(count);
+}
+
+function makeWorkspaceRouter(db, requireAuth, requireTenant) {
   const router = express.Router();
 
+  // ── Seleção inicial de workspace (pós-login) ───────────────────────
   router.get('/select-workspace', requireAuth, async (req, res) => {
     const memberships = await db('tenant_members')
       .join('tenants', 'tenants.id', 'tenant_members.tenant_id')
@@ -22,7 +40,6 @@ function makeWorkspaceRouter(db, requireAuth) {
 
     if (memberships.length === 0) return res.redirect('/create-workspace');
     if (memberships.length === 1) {
-      const { id, email } = req.user;
       const newToken = authService.signAccessToken({
         sub: req.user.sub,
         email: req.user.email,
@@ -51,6 +68,25 @@ function makeWorkspaceRouter(db, requireAuth) {
     return res.redirect('/app');
   });
 
+  // ── Troca de workspace in-app (dropdown) ──────────────────────────
+  router.post('/workspace/switch', requireAuth, async (req, res) => {
+    const { tenantId } = req.body;
+    const member = await db('tenant_members')
+      .where({ tenant_id: tenantId, user_id: req.user.sub })
+      .first();
+
+    if (!member) return res.status(403).json({ code: 'FORBIDDEN' });
+
+    const newToken = authService.signAccessToken({
+      sub: req.user.sub,
+      email: req.user.email,
+      tenantId,
+    });
+    res.cookie('access_token', newToken, COOKIE_OPTS);
+    return res.redirect('/app');
+  });
+
+  // ── Criar workspace ───────────────────────────────────────────────
   router.get('/create-workspace', requireAuth, (req, res) => {
     res.render('create-workspace', { user: req.user });
   });
@@ -59,12 +95,15 @@ function makeWorkspaceRouter(db, requireAuth) {
     const { name } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'name required' });
 
+    const ownedCount = await getOwnedCount(req.user.sub, db);
+    if (ownedCount >= OWNED_LIMIT) {
+      return res.status(403).json({ code: 'WORKSPACE_LIMIT_REACHED' });
+    }
+
     const slug = `${slugify(name)}-${Date.now()}`;
     const [tenant] = await db('tenants').insert({ name: name.trim(), slug }).returning('*');
 
-    await db.raw('ALTER TABLE tenant_members DISABLE ROW LEVEL SECURITY');
     await db('tenant_members').insert({ tenant_id: tenant.id, user_id: req.user.sub, role: 'owner' });
-    await db.raw('ALTER TABLE tenant_members ENABLE ROW LEVEL SECURITY');
 
     const newToken = authService.signAccessToken({
       sub: req.user.sub,
@@ -75,10 +114,18 @@ function makeWorkspaceRouter(db, requireAuth) {
     return res.redirect('/app');
   });
 
+  // ── Aceitar convite ───────────────────────────────────────────────
   router.get('/join', requireAuth, async (req, res) => {
     const { token } = req.query;
     const invite = await inviteService.validateInvite(token, db);
     if (!invite) return res.status(400).render('error', { message: 'Convite inválido ou expirado.' });
+
+    const totalCount = await getTotalCount(req.user.sub, db);
+    if (totalCount >= TOTAL_LIMIT) {
+      return res.render('error', {
+        message: `Você já participa de ${TOTAL_LIMIT} workspaces, o máximo permitido.`,
+      });
+    }
 
     const tenantId = await inviteService.acceptInvite(token, req.user.sub, db);
     const newToken = authService.signAccessToken({
@@ -88,6 +135,37 @@ function makeWorkspaceRouter(db, requireAuth) {
     });
     res.cookie('access_token', newToken, COOKIE_OPTS);
     return res.redirect('/app');
+  });
+
+  // ── Revogar membro (owner only) ───────────────────────────────────
+  router.delete('/workspace/members/:userId', requireAuth, requireTenant, async (req, res) => {
+    const { userId } = req.params;
+
+    // Verificar que requester é owner (sempre do banco, nunca do JWT)
+    const requester = await db('tenant_members')
+      .where({ tenant_id: req.tenantId, user_id: req.user.sub })
+      .first();
+    if (!requester || requester.role !== 'owner') {
+      return res.status(403).json({ code: 'FORBIDDEN' });
+    }
+
+    // Não pode se auto-revogar
+    if (userId === req.user.sub) {
+      return res.status(400).json({ code: 'CANNOT_REVOKE_SELF' });
+    }
+
+    // Verificar que o alvo existe e não é owner
+    const target = await db('tenant_members')
+      .where({ tenant_id: req.tenantId, user_id: userId })
+      .first();
+    if (!target) return res.status(404).json({ code: 'MEMBER_NOT_FOUND' });
+    if (target.role === 'owner') return res.status(400).json({ code: 'CANNOT_REVOKE_OWNER' });
+
+    await db('tenant_members')
+      .where({ tenant_id: req.tenantId, user_id: userId })
+      .del();
+
+    return res.status(200).json({ ok: true });
   });
 
   return router;

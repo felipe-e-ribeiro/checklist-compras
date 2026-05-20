@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const INVITE_EXPIRY_MS = 48 * 60 * 60 * 1000;
+const INVITE_EXPIRY_MS = 60 * 1000; // 60 segundos — link expira rápido por design de segurança
 
 async function createInvite(tenantId, userId, db) {
   const token = crypto.randomBytes(32).toString('hex');
