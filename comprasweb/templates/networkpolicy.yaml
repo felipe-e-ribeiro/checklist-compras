@@ -1,99 +1,24 @@
-# NetworkPolicies: least privilege
-# Topologia: internet → ingress-nginx → app → {postgres, redis, kube-dns}
-# Nenhum pod inicia conexões para fora do cluster.
+# NetworkPolicies: isolar postgres e redis — apenas o app consegue conectar.
+#
+# Estratégia: proteção seletiva dos backends (não default-deny-all).
+# O default-deny-all dependia do namespace exato do ingress controller
+# (hardcoded como "ingress-nginx") e quebrava em clusters onde o ingress
+# tem outro nome ou não tem o label kubernetes.io/metadata.name.
+#
+# O que está protegido:
+#   - Postgres: só aceita do app e do migration job (porta 5432)
+#   - Redis:    só aceita do app (porta 6379)
+#
+# O que não é restringido:
+#   - App: ingress livre (ingress controller chega independente de namespace)
+#   - App: egress livre (necessário para Google OAuth e outras APIs externas)
 
-# ── 1. Deny-all padrão ────────────────────────────────────────────────
-# Bloqueia todo tráfego não explicitamente permitido pelas policies abaixo.
+# ── PostgreSQL: só app e migration job ───────────────────────────────────────
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-deny-all
-  namespace: {{ .Values.namespace }}
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-    - Egress
-
-# ── 2. App: ingress do nginx ──────────────────────────────────────────
-# Permite que o nginx ingress controller chame o app na porta 3000.
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-ingress-to-app
-  namespace: {{ .Values.namespace }}
-spec:
-  podSelector:
-    matchLabels:
-      app: {{ .Values.comprasweb.serviceName | quote }}
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
-        - podSelector: {}   # health checks do mesmo namespace
-      ports:
-        - port: {{ .Values.comprasweb.port }}
-          protocol: TCP
-
-# ── 3. App: egress para postgres, redis e DNS ─────────────────────────
-# O app só pode conectar ao banco, ao redis e ao DNS do cluster.
-# Nenhuma saída para a internet.
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-app-egress
-  namespace: {{ .Values.namespace }}
-spec:
-  podSelector:
-    matchLabels:
-      app: {{ .Values.comprasweb.serviceName | quote }}
-  policyTypes:
-    - Egress
-  egress:
-    # PostgreSQL
-    - to:
-        - podSelector:
-            matchLabels:
-              app: "{{ .Release.Name }}-postgresql"
-      ports:
-        - port: 5432
-          protocol: TCP
-    # Redis
-    - to:
-        - podSelector:
-            matchLabels:
-              app: "{{ .Release.Name }}-redis"
-      ports:
-        - port: 6379
-          protocol: TCP
-    # DNS interno do cluster (kube-dns no namespace kube-system)
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-      ports:
-        - port: 53
-          protocol: UDP
-        - port: 53
-          protocol: TCP
-    # HTTPS para Google OAuth (token exchange + callback)
-    # O servidor precisa chamar oauth2.googleapis.com para trocar o código pelo token
-    - ports:
-        - port: 443
-          protocol: TCP
-
-# ── 4. PostgreSQL: só recebe do app e do migration job ────────────────
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-postgres-ingress
+  name: isolate-postgresql
   namespace: {{ .Values.namespace }}
 spec:
   podSelector:
@@ -101,7 +26,6 @@ spec:
       app: "{{ .Release.Name }}-postgresql"
   policyTypes:
     - Ingress
-    - Egress
   ingress:
     - from:
         - podSelector:
@@ -113,14 +37,13 @@ spec:
       ports:
         - port: 5432
           protocol: TCP
-  egress: []   # postgres não inicia conexões
 
-# ── 5. Redis: só recebe do app ────────────────────────────────────────
+# ── Redis: só app ─────────────────────────────────────────────────────────────
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-redis-ingress
+  name: isolate-redis
   namespace: {{ .Values.namespace }}
 spec:
   podSelector:
@@ -128,7 +51,6 @@ spec:
       app: "{{ .Release.Name }}-redis"
   policyTypes:
     - Ingress
-    - Egress
   ingress:
     - from:
         - podSelector:
@@ -136,36 +58,4 @@ spec:
               app: {{ .Values.comprasweb.serviceName | quote }}
       ports:
         - port: 6379
-          protocol: TCP
-  egress: []   # redis não inicia conexões
-
-# ── 6. Migration job: só pode conectar ao postgres e DNS ─────────────
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-migrate-egress
-  namespace: {{ .Values.namespace }}
-spec:
-  podSelector:
-    matchLabels:
-      app: "{{ .Release.Name }}-migrate"
-  policyTypes:
-    - Egress
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: "{{ .Release.Name }}-postgresql"
-      ports:
-        - port: 5432
-          protocol: TCP
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-      ports:
-        - port: 53
-          protocol: UDP
-        - port: 53
           protocol: TCP
