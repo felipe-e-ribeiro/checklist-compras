@@ -5,64 +5,286 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Privacidade — Lista de Compras</title>
   <link rel="stylesheet" href="/style.css">
+  <style>
+    .privacy-page {
+      min-height: 100vh;
+      background: var(--bg);
+      padding: clamp(32px, 6vw, 72px) clamp(16px, 4vw, 32px);
+    }
+    .privacy-inner {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    /* ── Hero ── */
+    .privacy-hero {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+    .privacy-shield {
+      width: 52px;
+      height: 52px;
+      background: var(--accent);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: #fff;
+    }
+    .privacy-hero-text h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .privacy-hero-text p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    /* ── Data grid ── */
+    .data-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .data-card {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+    .data-card-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent-light);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+    .data-card-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+    .data-card-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* ── Info row ── */
+    .info-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    @media (max-width: 520px) {
+      .info-row { grid-template-columns: 1fr; }
+    }
+    .info-card {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .info-card h3 {
+      font-family: var(--font-serif);
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+    .info-card p, .info-card li {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+    .info-card ul { padding-left: 16px; }
+    .info-card li { margin-bottom: 4px; }
+    .info-card code {
+      font-size: 11px;
+      background: var(--surface-alt);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    .no-share {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--accent);
+      margin-top: 10px;
+    }
+
+    /* ── Rights cards ── */
+    .rights-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .right-card {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .right-card-num {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 600;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .right-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .right-card-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    /* ── Actions ── */
+    .privacy-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+  </style>
 </head>
 <body>
-  <div class="page-center" style="align-items:flex-start;padding:40px 24px">
-    <div class="page-card" style="max-width:680px">
-      <div class="page-card-header">
-        <div class="brand" style="margin-bottom:20px">
-          <div class="brand-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
-              <line x1="3" y1="6" x2="21" y2="6"/>
-              <path d="M16 10a4 4 0 01-8 0"/>
-            </svg>
+  <div class="privacy-page">
+    <div class="privacy-inner">
+
+      <!-- Hero -->
+      <div class="privacy-hero">
+        <div class="privacy-shield">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <polyline points="9 12 11 14 15 10"/>
+          </svg>
+        </div>
+        <div class="privacy-hero-text">
+          <h1>Política de Privacidade</h1>
+          <p>Lista de Compras · Última atualização: 2026-05-20</p>
+        </div>
+      </div>
+
+      <!-- O que coletamos -->
+      <p class="section-label">O que armazenamos</p>
+      <div class="data-grid">
+        <div class="data-card">
+          <div class="data-card-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           </div>
-          Lista de Compras
+          <div class="data-card-name">E-mail</div>
+          <div class="data-card-desc">Identifica sua conta via Google OAuth</div>
         </div>
-        <h2 class="page-card-title">Política de Privacidade</h2>
-        <p class="page-card-sub">Última atualização: 2026-05-20</p>
-      </div>
-
-      <div style="font-size:15px;line-height:1.7;color:var(--text)">
-
-        <h3 style="font-family:var(--font-serif);font-size:1.2rem;margin:24px 0 8px">Dados que coletamos</h3>
-        <p>Ao autenticar com Google, recebemos e armazenamos:</p>
-        <ul style="margin:8px 0 0 20px;color:var(--text-muted)">
-          <li><strong style="color:var(--text)">E-mail</strong> — para identificação da conta</li>
-          <li><strong style="color:var(--text)">Nome</strong> — exibido na interface</li>
-          <li><strong style="color:var(--text)">Identificador Google</strong> — pseudônimo técnico para autenticação</li>
-        </ul>
-        <p style="margin-top:12px">Também armazenamos os <strong>itens da sua lista de compras</strong> e os <strong>workspaces</strong> que você cria ou integra.</p>
-
-        <h3 style="font-family:var(--font-serif);font-size:1.2rem;margin:24px 0 8px">Cookies utilizados</h3>
-        <p>Utilizamos apenas cookies <strong>estritamente necessários</strong> para o funcionamento da autenticação:</p>
-        <ul style="margin:8px 0 0 20px;color:var(--text-muted)">
-          <li><code>access_token</code> — token de sessão (expira em 15 minutos)</li>
-          <li><code>refresh_token</code> — renovação automática da sessão (expira em 30 dias)</li>
-        </ul>
-        <p style="margin-top:8px;font-size:13px;color:var(--text-muted)">Estes cookies são HttpOnly (não acessíveis por JavaScript) e necessários para que o serviço funcione. Base legal: execução de contrato (RGPD Art. 6(1)(b)).</p>
-
-        <h3 style="font-family:var(--font-serif);font-size:1.2rem;margin:24px 0 8px">Base legal para tratamento</h3>
-        <p>Todos os dados são tratados com base em <strong>execução de contrato</strong> (RGPD Art. 6(1)(b)) — são necessários para fornecer o serviço de lista de compras. Não utilizamos dados para marketing, publicidade ou compartilhamento com terceiros.</p>
-
-        <h3 style="font-family:var(--font-serif);font-size:1.2rem;margin:24px 0 8px">Seus direitos (RGPD)</h3>
-        <ul style="margin:8px 0 0 20px;color:var(--text-muted)">
-          <li><strong style="color:var(--text)">Acesso e portabilidade</strong> — exporte todos os seus dados em formato JSON</li>
-          <li><strong style="color:var(--text)">Esquecimento</strong> — delete sua conta para anonimizar todos os dados pessoais</li>
-          <li><strong style="color:var(--text)">Retificação</strong> — seus dados são sincronizados automaticamente via Google</li>
-        </ul>
-
-        <div class="divider" style="margin:24px 0"></div>
-
-        <div style="display:flex;gap:12px;flex-wrap:wrap">
-          <a href="/account/export" class="btn btn-ghost">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Exportar meus dados
-          </a>
-          <a href="/" class="btn btn-ghost">Voltar</a>
+        <div class="data-card">
+          <div class="data-card-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div class="data-card-name">Nome</div>
+          <div class="data-card-desc">Exibido na interface do aplicativo</div>
+        </div>
+        <div class="data-card">
+          <div class="data-card-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          </div>
+          <div class="data-card-name">ID Google</div>
+          <div class="data-card-desc">Pseudônimo técnico, não revela identidade</div>
+        </div>
+        <div class="data-card">
+          <div class="data-card-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
+          </div>
+          <div class="data-card-name">Lista de itens</div>
+          <div class="data-card-desc">Conteúdo que você adiciona às listas</div>
         </div>
       </div>
+
+      <!-- Cookies + Base legal -->
+      <p class="section-label">Como usamos</p>
+      <div class="info-row">
+        <div class="info-card">
+          <h3>Cookies</h3>
+          <ul>
+            <li><code>access_token</code> — sessão, 15 min</li>
+            <li><code>refresh_token</code> — renovação, 30 dias</li>
+          </ul>
+          <p style="margin-top:10px">Ambos são <strong>HttpOnly</strong> — invisíveis ao JavaScript, apenas para autenticação.</p>
+        </div>
+        <div class="info-card">
+          <h3>Base legal</h3>
+          <p>Tratamos seus dados com base em <strong>execução de contrato</strong> (RGPD Art. 6(1)(b)) — são necessários para fornecer o serviço.</p>
+          <div class="no-share">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            Sem publicidade ou venda de dados
+          </div>
+        </div>
+      </div>
+
+      <!-- Seus direitos -->
+      <p class="section-label">Seus direitos (RGPD)</p>
+      <div class="rights-grid">
+        <div class="right-card">
+          <div class="right-card-num">→</div>
+          <div class="right-card-title">Portabilidade</div>
+          <div class="right-card-desc">Exporte todos os seus dados em JSON a qualquer momento</div>
+        </div>
+        <div class="right-card">
+          <div class="right-card-num">⊘</div>
+          <div class="right-card-title">Esquecimento</div>
+          <div class="right-card-desc">Delete sua conta — todos os dados pessoais são anonimizados</div>
+        </div>
+        <div class="right-card">
+          <div class="right-card-num">↻</div>
+          <div class="right-card-title">Retificação</div>
+          <div class="right-card-desc">Seus dados são atualizados automaticamente via Google</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="privacy-actions" style="margin-top:20px">
+        <a href="/account/export" class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exportar meus dados
+        </a>
+        <a href="/" class="btn btn-ghost">Voltar</a>
+      </div>
+
     </div>
   </div>
 </body>

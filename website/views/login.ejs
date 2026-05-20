@@ -5,6 +5,80 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lista de Compras</title>
   <link rel="stylesheet" href="/style.css">
+  <style>
+    /* ── Checkbox de consentimento ── */
+    .consent-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 20px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .consent-checkbox {
+      position: relative;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .consent-checkbox input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .consent-box {
+      width: 20px;
+      height: 20px;
+      border: 1.5px solid var(--border);
+      border-radius: 5px;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .consent-checkbox input:checked + .consent-box {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .consent-checkmark {
+      opacity: 0;
+      transform: scale(0.5);
+      transition: all 0.15s ease;
+      color: #fff;
+    }
+    .consent-checkbox input:checked + .consent-box .consent-checkmark {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .consent-text {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .consent-text a { color: var(--accent); text-decoration: underline; }
+
+    /* ── Botão Google desativado ── */
+    .btn-google-wrap { transition: opacity 0.2s ease; }
+    .btn-google-wrap.locked {
+      opacity: 0.38;
+      pointer-events: none;
+      filter: grayscale(0.4);
+    }
+    .btn-google-wrap.locked .btn-google { cursor: not-allowed; }
+
+    /* ── Reset link ── */
+    .reset-link {
+      font-size: 11px;
+      color: var(--border);
+      cursor: pointer;
+      text-align: center;
+      display: block;
+      margin-top: 10px;
+      transition: color 0.15s;
+    }
+    .reset-link:hover { color: var(--text-muted); }
+  </style>
 </head>
 <body>
   <div class="login-page">
@@ -21,29 +95,31 @@
       <p class="login-sub">Organize as compras da família em tempo real, com todos em sincronia.</p>
 
       <% if (typeof query !== 'undefined' && query && query.deleted === '1') { %>
-        <div style="background:var(--accent-light);color:var(--accent);border-radius:var(--radius-sm);padding:10px 14px;font-size:14px;margin-bottom:16px;">
-          Sua conta foi deletada e seus dados foram anonimizados.
+        <div style="background:var(--accent-light);color:var(--accent);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;margin-bottom:20px;display:flex;align-items:center;gap:8px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Conta deletada — dados anonimizados com sucesso.
         </div>
       <% } %>
 
-      <!-- Banner de consentimento — exibido enquanto não há aceite em localStorage -->
-      <div id="consent-banner" style="display:none;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px;font-size:13px;color:var(--text-muted)">
-        <p style="margin-bottom:8px">
-          Este serviço utiliza <strong style="color:var(--text)">cookies necessários</strong> para autenticação
-          (tokens de sessão HttpOnly). Ao entrar, seus dados do Google (e-mail e nome)
-          serão armazenados para fornecer o serviço.
-        </p>
-        <p style="margin-bottom:10px">
-          Base legal: execução de contrato (RGPD Art. 6(1)(b)).
-          <a href="/privacy" style="color:var(--accent)" target="_blank">Política de Privacidade</a>
-        </p>
-        <button id="accept-btn" class="btn btn-primary" style="height:36px;font-size:13px">
-          Aceitar e Continuar
-        </button>
-      </div>
+      <!-- Checkbox de consentimento inline -->
+      <label class="consent-row" id="consent-label">
+        <span class="consent-checkbox">
+          <input type="checkbox" id="consent-check">
+          <span class="consent-box">
+            <svg class="consent-checkmark" width="11" height="11" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1.5,5 4.5,8 10.5,1.5"/>
+            </svg>
+          </span>
+        </span>
+        <span class="consent-text">
+          Li e aceito a
+          <a href="/privacy" target="_blank" onclick="event.stopPropagation()">Política de Privacidade</a>
+          — usamos apenas cookies necessários para autenticação.
+        </span>
+      </label>
 
-      <!-- Botão de login — visível apenas após consentimento -->
-      <div id="login-btn-wrap" style="display:none">
+      <!-- Botão Google — bloqueado até consentimento -->
+      <div class="btn-google-wrap locked" id="google-wrap">
         <a href="/auth/google" class="btn btn-google">
           <svg width="18" height="18" viewBox="0 0 18 18">
             <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
@@ -53,46 +129,40 @@
           </svg>
           Entrar com Google
         </a>
-
-        <div class="login-divider"></div>
-        <p style="font-size:12px;color:var(--text-muted);text-align:center">
-          <a href="/privacy" style="color:var(--accent)">Política de Privacidade</a>
-          &nbsp;·&nbsp;
-          <a href="#" id="reset-consent" style="color:var(--text-muted)">Revogar consentimento</a>
-        </p>
       </div>
+
+      <span class="reset-link" id="reset-consent" style="display:none">
+        Revogar consentimento
+      </span>
     </div>
   </div>
 
   <script>
     const CONSENT_KEY = 'gdpr_consent_v1';
+    const check = document.getElementById('consent-check');
+    const wrap  = document.getElementById('google-wrap');
+    const reset = document.getElementById('reset-consent');
 
-    function showLogin() {
-      document.getElementById('consent-banner').style.display = 'none';
-      document.getElementById('login-btn-wrap').style.display = 'block';
+    function applyConsent(accepted) {
+      check.checked = accepted;
+      wrap.classList.toggle('locked', !accepted);
+      reset.style.display = accepted ? 'block' : 'none';
     }
 
-    function showBanner() {
-      document.getElementById('consent-banner').style.display = 'block';
-      document.getElementById('login-btn-wrap').style.display = 'none';
-    }
+    // Restaurar estado salvo
+    applyConsent(localStorage.getItem(CONSENT_KEY) === 'accepted');
 
-    // Verificar consentimento existente
-    if (localStorage.getItem(CONSENT_KEY) === 'accepted') {
-      showLogin();
-    } else {
-      showBanner();
-    }
-
-    document.getElementById('accept-btn').addEventListener('click', () => {
-      localStorage.setItem(CONSENT_KEY, 'accepted');
-      showLogin();
+    check.addEventListener('change', () => {
+      const accepted = check.checked;
+      accepted
+        ? localStorage.setItem(CONSENT_KEY, 'accepted')
+        : localStorage.removeItem(CONSENT_KEY);
+      applyConsent(accepted);
     });
 
-    document.getElementById('reset-consent')?.addEventListener('click', (e) => {
-      e.preventDefault();
+    reset.addEventListener('click', () => {
       localStorage.removeItem(CONSENT_KEY);
-      showBanner();
+      applyConsent(false);
     });
   </script>
 </body>
