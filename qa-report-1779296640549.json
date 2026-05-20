@@ -1,0 +1,101 @@
+{
+  "timestamp": "2026-05-20T17:04:00.549Z",
+  "config": {
+    "url": "http://localhost:3000",
+    "maxUsers": 100,
+    "durationS": 60
+  },
+  "environment": {
+    "node": "v24.12.0",
+    "platform": "win32"
+  },
+  "operations": {
+    "auth": {
+      "count": 1,
+      "errors": 0,
+      "errorPct": 0,
+      "avg": 106,
+      "p50": 106,
+      "p95": 106,
+      "p99": 106,
+      "min": 106,
+      "max": 106
+    },
+    "add": {
+      "count": 876,
+      "errors": 0,
+      "errorPct": 0,
+      "avg": 446,
+      "p50": 421,
+      "p95": 826,
+      "p99": 916,
+      "min": 13,
+      "max": 974
+    },
+    "list": {
+      "count": 876,
+      "errors": 0,
+      "errorPct": 0,
+      "avg": 3306,
+      "p50": 3642,
+      "p95": 5680,
+      "p99": 6268,
+      "min": 86,
+      "max": 6548
+    },
+    "check": {
+      "count": 876,
+      "errors": 0,
+      "errorPct": 0,
+      "avg": 464,
+      "p50": 427,
+      "p95": 804,
+      "p99": 862,
+      "min": 14,
+      "max": 878
+    },
+    "critical": {
+      "count": 876,
+      "errors": 0,
+      "errorPct": 0,
+      "avg": 1163,
+      "p50": 955,
+      "p95": 2728,
+      "p99": 3449,
+      "min": 62,
+      "max": 3896
+    },
+    "quantity": {
+      "count": 876,
+      "errors": 0,
+      "errorPct": 0,
+      "avg": 1306,
+      "p50": 987,
+      "p95": 2971,
+      "p99": 3516,
+      "min": 23,
+      "max": 3851
+    },
+    "clear": {
+      "count": 1,
+      "errors": 0,
+      "errorPct": 0,
+      "avg": 12,
+      "p50": 12,
+      "p95": 12,
+      "p99": 12,
+      "min": 12,
+      "max": 12
+    }
+  },
+  "summary": {
+    "totalRequests": 4382,
+    "totalErrors": 0,
+    "errorRate": 0,
+    "durationS": 79,
+    "p95Overall": 4476,
+    "p99Overall": 5680,
+    "slowestOp": "list",
+    "bottleneck": "DATABASE — query lenta (GET /app faz join de 3 tabelas)"
+  }
+}

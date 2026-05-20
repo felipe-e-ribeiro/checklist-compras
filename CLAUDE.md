@@ -130,6 +130,25 @@ Each client joins a room keyed by `tenantId`. The Socket.IO middleware reads the
 - Integration route tests use Supertest against the full Express app with a real DB.
 - The OAuth callback handler `_handleOAuthCallback` is exported from `routes/auth.js` for direct testing, bypassing Passport.
 
+## Testes de carga (obrigatório antes de releases)
+
+Use a skill `qa-load-test` (`.claude/skills/qa-load-test/`) antes de cada release:
+
+```bash
+# Pré-requisito: port-forward ativo
+kubectl port-forward -n comprasweb-local svc/comprasweb 3000:3000 &
+
+# Protocolo completo (4 fases)
+node .claude/skills/qa-load-test/scripts/load-test.js http://localhost:3000 5   30  # baseline
+node .claude/skills/qa-load-test/scripts/load-test.js http://localhost:3000 20  60  # ramp
+node .claude/skills/qa-load-test/scripts/load-test.js http://localhost:3000 50  60  # stress
+node .claude/skills/qa-load-test/scripts/load-test.js http://localhost:3000 100 60  # peak
+```
+
+**Limites conhecidos (single pod):** ≤20 usuários P99 <1s ✓ | 50 usuários P99 ~4s ⚠ | 100 usuários P99 ~6s ⚠  
+**Elo mais fraco:** Knex pool (max:10) + `GET /app` abre 3 conexões simultâneas.  
+**Fix prioritário:** `pool: { max: 50 }` em `db.js` + separar query `allWorkspaces` do GET /app.
+
 ## Docker & Kubernetes
 
 **Build image** (uses `node:lts` Debian — Alpine causes musl/glibc bcrypt incompatibility):
