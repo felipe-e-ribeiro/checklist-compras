@@ -31,6 +31,28 @@ curl -s http://localhost:3000/access | grep -c "Acesso"  # deve retornar 1
 
 Para produção, troque a URL e use `--url https://seu-dominio.com`.
 
+## Cleanup antes de testar
+
+Sempre limpe dados de testes anteriores antes de iniciar — evita que itens
+acumulados distorçam os resultados (especialmente o `GET /app`):
+
+```bash
+# Via psql (mais rápido)
+kubectl exec -n comprasweb-local comprasweb-postgresql-0 -- \
+  psql -U compras -d lista_compras -c "
+    DELETE FROM items
+    WHERE tenant_id IN (
+      SELECT t.id FROM tenants t
+      JOIN tenant_members tm ON tm.tenant_id = t.id
+      JOIN users u ON u.id = tm.user_id
+      WHERE u.google_id LIKE 'local:%'
+    );"
+```
+
+O script já inclui cleanup automático no final (Phase 4): marca todos os itens
+criados como checked → arquiva → deleta arquivados. A lista fica limpa para
+o próximo teste.
+
 ## Execução rápida
 
 ```bash

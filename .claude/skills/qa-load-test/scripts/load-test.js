@@ -207,10 +207,25 @@ async function main() {
   }
   console.log(`\n  Done: ${waves} waves\n`);
 
-  // ── Phase 4: Clear + cooldown ─────────────────────────────────────────
-  process.stdout.write('▶ Phase 4: Clear + cooldown... ');
-  await clearChecked(jar);
-  console.log('✓\n');
+  // ── Phase 4: Cleanup — remove todos os itens criados pelo teste ──────
+  process.stdout.write(`▶ Phase 4: Cleanup (${sharedIds.length} itens)... `);
+  try {
+    // 1. Marcar todos os itens rastreados como checked
+    const BATCH = 20;
+    for (let i = 0; i < sharedIds.length; i += BATCH) {
+      const batch = sharedIds.slice(i, i + BATCH);
+      await Promise.all(batch.map(id =>
+        request('POST', '/app/check', `id=${id}&checked=on`, jar).catch(() => {})
+      ));
+    }
+    // 2. Arquivar todos os checked
+    await clearChecked(jar);
+    // 3. Deletar todos os arquivados
+    await request('DELETE', '/app/remove-archived', null, jar);
+    console.log('✓ Lista limpa\n');
+  } catch (e) {
+    console.log(`⚠ (${e.message}) — limpe manualmente via /app\n`);
+  }
 
   // ── Report ────────────────────────────────────────────────────────────
   const ops = ['auth', 'add', 'list', 'check', 'critical', 'quantity', 'clear'];
