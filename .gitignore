@@ -2,6 +2,7 @@
 .claude/
 docs/
 CLAUDE.md
+tmp/
 
 # Reports and temp files
 reports/*
