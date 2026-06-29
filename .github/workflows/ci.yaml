@@ -7,8 +7,35 @@ on:
     branches: [main]
 
 jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          exit-code: '1'
+          severity: CRITICAL
+          ignore-unfixed: true
+
   test:
     runs-on: ubuntu-latest
+    needs: [gitleaks, trivy]
     services:
       postgres:
         image: postgres:16
@@ -80,23 +107,4 @@ jobs:
           LOCAL_AUTH_ENABLED: "true"
           LOCAL_AUTH_USER: loadtest
           LOCAL_AUTH_PASSWORD: loadtest123
-        # jest.config.js enforces 100% via coverageThreshold — jest exits non-zero if coverage drops
         run: npm run test:coverage
-
-  trivy:
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build Docker image
-        run: docker build -t app:${{ github.sha }} .
-
-      - name: Run Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: app:${{ github.sha }}
-          format: table
-          exit-code: '1'
-          severity: CRITICAL
-          ignore-unfixed: true  # ignora CVEs sem fix disponível (ex: zlib1g will_not_fix)
