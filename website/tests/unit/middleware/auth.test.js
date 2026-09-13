@@ -1,7 +1,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../../../.env.test') });
 
 const authService = require('../../../services/authService');
-const { makeRequireAuth } = require('../../../middleware/auth');
+const { makeRequireAuth, COOKIE_OPTS } = require('../../../middleware/auth');
 const { getTestDb, truncateAll, destroyDb } = require('../../helpers/dbSetup');
 
 let db;
@@ -17,6 +17,16 @@ afterAll(async () => { await destroyDb(); });
 function mockRes() {
   return { redirect: jest.fn(), status: jest.fn().mockReturnThis(), json: jest.fn(), cookie: jest.fn() };
 }
+
+describe('COOKIE_OPTS', () => {
+  test('has a maxAge so o cookie sobrevive a fechar o navegador', () => {
+    // Sem maxAge o cookie vira "session cookie" e some ao fechar a
+    // aba/app, forçando login repetido mesmo com refresh_token ainda
+    // válido no banco -- este teste trava essa regressão específica.
+    expect(COOKIE_OPTS.maxAge).toBe(authService.REFRESH_TOKEN_EXPIRY_MS);
+    expect(COOKIE_OPTS.maxAge).toBeGreaterThan(0);
+  });
+});
 
 describe('valid access token', () => {
   test('injects req.user and calls next()', async () => {

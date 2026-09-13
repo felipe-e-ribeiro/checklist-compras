@@ -5,6 +5,14 @@ const COOKIE_OPTS = {
   httpOnly: true,
   secure: /* istanbul ignore next */ process.env.NODE_ENV === 'production',
   sameSite: 'lax', // 'strict' bloqueia cookies em redirect chains do OAuth (Google → callback → app)
+  // Sem isso os dois cookies viram "session cookie" do navegador -- somem
+  // ao fechar a aba/app (comum no mobile), forçando novo login do Google
+  // mesmo com refresh_token ainda válido por 30 dias no banco. maxAge
+  // igual ao do refresh_token: o access_token (JWT de 15min) expira bem
+  // antes disso de qualquer forma, então não faz diferença ele carregar
+  // um cookie "válido" por mais tempo -- verifyAccessToken já rejeita o
+  // JWT vencido e cai no fluxo de refresh normalmente.
+  maxAge: authService.REFRESH_TOKEN_EXPIRY_MS,
 };
 
 function makeRequireAuth(db) {

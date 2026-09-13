@@ -58,6 +58,7 @@ async function rotateRefreshToken(oldRecord, userId, db) {
 }
 
 module.exports = {
+  REFRESH_TOKEN_EXPIRY_MS,
   signAccessToken,
   verifyAccessToken,
   decodeWithoutVerify,
