@@ -44,25 +44,31 @@ jobs:
     needs: build-and-push
 
     steps:
-      - name: Checkout infra repo
+      # Os manifests do comprasweb vivem no monorepo tools-infra
+      # (tools/comprasweb). Secret TOOLS_INFRA_TOKEN: PAT fine-grained com
+      # escrita SÓ no tools-infra (o mesmo nos repos de código de todos os apps).
+      - name: Checkout tools-infra
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository_owner }}/checklist-compras-infra
-          token: ${{ secrets.INFRA_PAT }}
+          repository: ${{ github.repository_owner }}/tools-infra
+          token: ${{ secrets.TOOLS_INFRA_TOKEN }}
 
-      - name: Update image tag in values.yaml
-        # Desde a migração pro platform-chart (2026-09-13) o arquivo é
-        # values.yaml na raiz, não mais comprasweb/values-prod.yaml -- e
-        # values.yaml tem outro campo "tag:" (postgres.image.tag), então
-        # usa yq (já vem no runner ubuntu-latest) em vez de sed pra
-        # mudar só platform-chart.api.image.tag.
+      - name: Update image tag (tools/comprasweb/values.yaml)
+        # yq (já vem no runner) em vez de sed: muda só
+        # platform-chart.api.image.tag.
         run: |
-          yq -i '.["platform-chart"].api.image.tag = "${{ github.ref_name }}"' values.yaml
+          yq -i '.["platform-chart"].api.image.tag = "${{ github.ref_name }}"' tools/comprasweb/values.yaml
 
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add values.yaml
-          git commit -m "chore: atualizar tag da imagem para ${{ github.ref_name }}"
-          git push
+          git add tools/comprasweb/values.yaml
+          git diff --cached --quiet && { echo "Tag já atualizada"; exit 0; }
+          git commit -m "chore(comprasweb): atualizar tag da imagem para ${{ github.ref_name }}"
+          for attempt in 1 2 3; do
+            git push && exit 0
+            echo "push recusado (outro CD gravou no tools-infra); rebase e nova tentativa"
+            git pull --rebase
+          done
+          exit 1
